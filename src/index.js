@@ -10,6 +10,7 @@ import { FormattedMessage } from '@openimis/fe-core';
 import { RIGHT_PAYMENT_POINT_SEARCH, RIGHT_PAYROLL_CREATE, RIGHT_PAYROLL_SEARCH } from './constants';
 import reducer from './reducer';
 import messages_en from './translations/en.json';
+import messages_fr from './translations/fr.json';
 import PaymentPointPage from './pages/payment-point/PaymentPointPage';
 import PaymentPointsPage from './pages/payment-point/PaymentPointsPage';
 import PayrollPage from './pages/payroll/PayrollPage';
@@ -51,7 +52,10 @@ const ROUTE_PAYROLLS_RECONCILED = 'payrollsReconciled';
 const ROUTE_PAYROLL = 'payrolls/payroll';
 
 const DEFAULT_CONFIG = {
-  translations: [{ key: 'en', messages: messages_en }],
+  translations: [
+    { key: 'en', messages: messages_en },
+    { key: 'fr', messages: messages_fr }
+  ],
   reducers: [{ key: 'payroll', reducer }],
   refs: [
     { key: 'payroll.route.paymentPoints', ref: ROUTE_PAYMENT_POINTS },
