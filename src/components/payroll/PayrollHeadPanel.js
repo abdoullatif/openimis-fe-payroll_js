@@ -1,10 +1,8 @@
 /* eslint-disable camelcase */
 import React from 'react';
 import { injectIntl } from 'react-intl';
-
 import { Grid, Divider, Typography } from '@material-ui/core';
 import { withStyles, withTheme } from '@material-ui/core/styles';
-
 import {
   formatMessage,
   FormPanel,
@@ -43,34 +41,65 @@ class PayrollHeadPanel extends FormPanel {
     const { jsonExt } = props?.edited ?? {};
     if (jsonExt) {
       const filters = this.getDefaultAppliedCustomFilters(jsonExt);
-      this.setState({ appliedCustomFilters: filters, appliedFiltersRowStructure: filters });
+      this.setState({
+        appliedCustomFilters: filters,
+        appliedFiltersRowStructure: filters,
+      });
     }
   };
 
   updateJsonExt = (value) => {
-    this.updateAttributes({
-      jsonExt: value,
-    });
+    this.updateAttributes({ jsonExt: value });
   };
 
-  // eslint-disable-next-line class-methods-use-this
+  /**
+   * Désérialise les critères sauvegardés dans jsonExt
+   * et restaure les objets complexes (Location, BenefitPlan, etc.)
+   */
   getDefaultAppliedCustomFilters = (jsonExt) => {
+    if (!jsonExt) return [];
+
     try {
       const jsonData = JSON.parse(jsonExt);
       const advancedCriteria = jsonData.advanced_criteria || [];
-      const transformedCriteria = advancedCriteria.map(({ custom_filter_condition }) => {
-        const [field, filter, typeValue] = custom_filter_condition.split('__');
-        const [type, value] = typeValue.split('=');
-        return {
-          custom_filter_condition,
+
+      return advancedCriteria.map((criteria) => {
+        const {
+          amount,
           field,
           filter,
           type,
+          referential,
+          typeLocation,
           value,
+          custom_filter_condition,
+        } = criteria;
+
+        let parsedValue = value;
+        if (typeof value === 'string') {
+          // tente de parser JSON si la valeur est sérialisée
+          try {
+            parsedValue = JSON.parse(value);
+          } catch (e) {
+            parsedValue = value; // simple string
+          }
+        }
+
+        return {
+          amount: amount ?? '',
+          field: field ?? '',
+          filter: filter ?? '',
+          type: type ?? '',
+          referential: referential ?? '',
+          typeLocation: typeLocation ?? '',
+          value: parsedValue ?? '',
+          custom_filter_condition:
+            custom_filter_condition ??
+            `${field}__${filter}__${type}=${parsedValue}`,
         };
       });
-      return transformedCriteria;
     } catch (error) {
+      console.warn('Erreur parsing advanced_criteria :', error);
       return [];
     }
   };
@@ -85,10 +114,16 @@ class PayrollHeadPanel extends FormPanel {
 
   render() {
     const {
-      edited, classes, intl, readOnly, isPayrollFromFailedInvoices, benefitPlanId,
+      edited,
+      classes,
+      intl,
+      readOnly,
+      isPayrollFromFailedInvoices,
+      benefitPlanId,
     } = this.props;
     const payroll = { ...edited };
     const { appliedCustomFilters, appliedFiltersRowStructure } = this.state;
+
     return (
       <>
         <Grid container className={classes.item}>
@@ -99,31 +134,38 @@ class PayrollHeadPanel extends FormPanel {
               value={payroll?.name}
               required
               onChange={(name) => this.updateAttribute('name', name)}
-              readOnly={isPayrollFromFailedInvoices ? !isPayrollFromFailedInvoices : readOnly}
+              readOnly={isPayrollFromFailedInvoices || readOnly}
             />
           </Grid>
+
           <Grid item xs={3} className={classes.item}>
             <PublishedComponent
               pubRef="contributionPlan.PaymentPlanPicker"
               required
               filterLabels={false}
-              onChange={(paymentPlan) => this.updateAttribute('paymentPlan', paymentPlan)}
+              onChange={(paymentPlan) =>
+                this.updateAttribute('paymentPlan', paymentPlan)
+              }
               value={payroll?.paymentPlan}
               readOnly={readOnly}
               benefitPlanId={benefitPlanId}
             />
           </Grid>
+
           <Grid item xs={3} className={classes.item}>
             <PublishedComponent
               pubRef="payroll.PaymentPointPicker"
               withLabel
               withPlaceholder
               filterLabels={false}
-              onChange={(paymentPoint) => this.updateAttribute('paymentPoint', paymentPoint)}
+              onChange={(paymentPoint) =>
+                this.updateAttribute('paymentPoint', paymentPoint)
+              }
               value={payroll?.paymentPoint}
               readOnly={readOnly}
             />
           </Grid>
+
           <Grid item xs={3} className={classes.item}>
             <PublishedComponent
               pubRef="paymentCycle.PaymentCyclePicker"
@@ -131,97 +173,116 @@ class PayrollHeadPanel extends FormPanel {
               required
               withPlaceholder
               filterLabels={false}
-              onChange={(paymentCycle) => this.updateAttribute('paymentCycle', paymentCycle)}
+              onChange={(paymentCycle) =>
+                this.updateAttribute('paymentCycle', paymentCycle)
+              }
               value={payroll?.paymentCycle}
-              readOnly={isPayrollFromFailedInvoices ? !isPayrollFromFailedInvoices : readOnly}
+              readOnly={isPayrollFromFailedInvoices || readOnly}
             />
           </Grid>
+
           {readOnly && !isPayrollFromFailedInvoices && (
-          <Grid item xs={3} className={classes.item}>
-            <PayrollStatusPicker
-              required
-              withNull={false}
-              readOnly={readOnly}
-              value={!!payroll?.status && payroll.status}
-            />
-          </Grid>
+            <Grid item xs={3} className={classes.item}>
+              <PayrollStatusPicker
+                required
+                withNull={false}
+                readOnly={readOnly}
+                value={payroll?.status}
+              />
+            </Grid>
           )}
+
           <Grid item xs={3} className={classes.item}>
             <PaymentMethodPicker
               required
               withNull={false}
               readOnly={readOnly}
-              value={!!payroll?.paymentMethod && payroll.paymentMethod}
-              onChange={(paymentMethod) => this.updateAttribute('paymentMethod', paymentMethod)}
+              value={payroll?.paymentMethod}
+              onChange={(paymentMethod) =>
+                this.updateAttribute('paymentMethod', paymentMethod)
+              }
               label={formatMessage(intl, 'payroll', 'paymentMethod')}
             />
           </Grid>
+
           <Grid item xs={3} className={classes.item}>
             <PublishedComponent
               pubRef="core.DatePicker"
               module="payroll"
               label="dateValidFrom"
               required
-              value={payroll.dateValidFrom ? payroll.dateValidFrom : null}
+              value={payroll.dateValidFrom || null}
               onChange={(v) => this.updateAttribute('dateValidFrom', v)}
               readOnly={readOnly}
             />
           </Grid>
+
           <Grid item xs={3} className={classes.item}>
             <PublishedComponent
               pubRef="core.DatePicker"
               module="payroll"
               label="dateValidTo"
               required
-              value={payroll.dateValidTo ? payroll.dateValidTo : null}
+              value={payroll.dateValidTo || null}
               onChange={(v) => this.updateAttribute('dateValidTo', v)}
               readOnly={readOnly}
             />
           </Grid>
         </Grid>
+
         <Divider />
-        {!isPayrollFromFailedInvoices
-            && (
-            <>
-              <>
-                <Typography>
-                  <div className={classes.item}>
-                    <FormattedMessage module="contributionPlan" id="paymentPlan.advancedCriteria" />
-                  </div>
-                </Typography>
-                {!readOnly && (
-                  <div className={classes.item}>
-                    <FormattedMessage module="contributionPlan" id="paymentPlan.advancedCriteria.tip" />
-                  </div>
-                )}
-                <Divider />
-                <Grid container className={classes.item}>
 
-                  <AdvancedFiltersDialog
-                    object={payroll?.paymentPlan?.benefitPlan
-                      ? JSON.parse(JSON.parse(payroll.paymentPlan.benefitPlan))
-                      : null}
-                    objectToSave={payroll}
-                    moduleName="social_protection"
-                    objectType="BenefitPlan"
-                    setAppliedCustomFilters={this.setAppliedCustomFilters}
-                    appliedCustomFilters={appliedCustomFilters}
-                    appliedFiltersRowStructure={appliedFiltersRowStructure}
-                    setAppliedFiltersRowStructure={this.setAppliedFiltersRowStructure}
-                    updateAttributes={this.updateJsonExt}
-                    getDefaultAppliedCustomFilters={() => this.getDefaultAppliedCustomFilters(payroll.jsonExt)}
-                    readOnly={readOnly}
-                    edited={this.props.edited}
-                  />
-
-                </Grid>
-              </>
-              <Divider />
-            </>
+        {!isPayrollFromFailedInvoices && (
+          <>
+            <Typography>
+              <div className={classes.item}>
+                <FormattedMessage
+                  module="contributionPlan"
+                  id="paymentPlan.advancedCriteria"
+                />
+              </div>
+            </Typography>
+            {!readOnly && (
+              <div className={classes.item}>
+                <FormattedMessage
+                  module="contributionPlan"
+                  id="paymentPlan.advancedCriteria.tip"
+                />
+              </div>
             )}
+            <Divider />
+            <Grid container className={classes.item}>
+              <AdvancedFiltersDialog
+                object={
+                  payroll?.paymentPlan?.benefitPlan
+                    ? JSON.parse(JSON.parse(payroll.paymentPlan.benefitPlan))
+                    : null
+                }
+                objectToSave={payroll}
+                moduleName="social_protection"
+                objectType="BenefitPlan"
+                setAppliedCustomFilters={this.setAppliedCustomFilters}
+                appliedCustomFilters={appliedCustomFilters}
+                appliedFiltersRowStructure={appliedFiltersRowStructure}
+                setAppliedFiltersRowStructure={
+                  this.setAppliedFiltersRowStructure
+                }
+                updateAttributes={this.updateJsonExt}
+                getDefaultAppliedCustomFilters={() =>
+                  this.getDefaultAppliedCustomFilters(payroll.jsonExt)
+                }
+                readOnly={readOnly}
+                edited={this.props.edited}
+              />
+            </Grid>
+            <Divider />
+          </>
+        )}
       </>
     );
   }
 }
 
-export default withModulesManager(injectIntl(withTheme(withStyles(styles)(PayrollHeadPanel))));
+export default withModulesManager(
+  injectIntl(withTheme(withStyles(styles)(PayrollHeadPanel))),
+);

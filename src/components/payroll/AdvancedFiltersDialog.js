@@ -32,7 +32,6 @@ function AdvancedFiltersDialog({
   moduleName,
   objectType,
   setAppliedCustomFilters,
-  // eslint-disable-next-line no-unused-vars
   appliedFiltersRowStructure,
   setAppliedFiltersRowStructure,
   updateAttributes,
@@ -43,9 +42,8 @@ function AdvancedFiltersDialog({
   edited,
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  // eslint-disable-next-line no-unused-vars
   const [currentFilter, setCurrentFilter] = useState({
-    field: '', filter: '', type: '', value: '', amount: '',
+    field: '', filter: '', type: '', value: '', amount: '', referential: '', typeLocation: '',
   });
   const [filters, setFilters] = useState(getDefaultAppliedCustomFilters(objectToSave.jsonExt));
 
@@ -53,8 +51,7 @@ function AdvancedFiltersDialog({
     setFilters(getDefaultAppliedCustomFilters(objectToSave.jsonExt));
   }, [objectToSave.jsonExt]);
 
-  useEffect(() => {
-  }, [edited]);
+  useEffect(() => {}, [edited]);
 
   const createParams = (moduleName, objectTypeName, uuidOfObject = null, additionalParams = null) => {
     const params = [
@@ -87,6 +84,9 @@ function AdvancedFiltersDialog({
     setFilters([...filters, CLEARED_STATE_FILTER]);
   };
 
+  /**
+   * Met à jour le jsonExt du BenefitPlan
+   */
   function updateJsonExt(inputJsonExt, outputFilters) {
     const existingData = JSON.parse(inputJsonExt || '{}');
     if (!existingData.hasOwnProperty('advanced_criteria')) {
@@ -94,19 +94,47 @@ function AdvancedFiltersDialog({
     }
     const filterData = JSON.parse(outputFilters);
     existingData.advanced_criteria = filterData;
-    const updatedJsonExt = JSON.stringify(existingData);
-    return updatedJsonExt;
+    return JSON.stringify(existingData);
   }
 
+  /**
+   * Sauvegarde des filtres appliqués
+   * Sérialisation correcte des objets Location (ou autres objets complexes)
+   */
   const saveCriteria = () => {
     setAppliedFiltersRowStructure(filters);
+
     const outputFilters = JSON.stringify(
-      filters.map(({
-        filter, value, field, type,
-      }) => ({
-        custom_filter_condition: `${field}__${filter}__${type}=${value}`,
-      })),
+      filters.map(({ filter, value, field, type, referential, typeLocation, amount }) => {
+        let safeValue = value ?? '';
+
+        // Sérialisation des objets (Locations, BenefitPlan, etc.)
+        if (typeof safeValue === 'object' && safeValue !== null) {
+          try {
+            safeValue = JSON.stringify(safeValue);
+          } catch (e) {
+            safeValue = '[Unserializable Object]';
+          }
+        }
+
+        // Détection automatique du type de localité si non précisé
+        if (referential === 'Location' && !typeLocation && value?.__typename) {
+          typeLocation = value.__typename.replace('GQLType', '');
+        }
+
+        return {
+          amount: amount ?? '',
+          field,
+          filter,
+          type,
+          referential,
+          typeLocation,
+          value: safeValue,
+          custom_filter_condition: `${field}__${filter}__${type}=${safeValue}`,
+        };
+      })
     );
+
     const jsonExt = updateJsonExt(objectToSave.jsonExt, outputFilters);
     updateAttributes(jsonExt);
     setAppliedCustomFilters(outputFilters);
@@ -133,10 +161,12 @@ function AdvancedFiltersDialog({
       fetchFilters(paramsToFetchFilters);
     }
   }, [object]);
+
   return (
     <>
       {filters.map((filter, index) => (
         <AdvancedFiltersRowValue
+          key={index}
           customFilters={customFilters}
           currentFilter={filter}
           setCurrentFilter={setCurrentFilter}
@@ -146,16 +176,15 @@ function AdvancedFiltersDialog({
           readOnly={readOnly || confirmed}
         />
       ))}
-      { !readOnly && !confirmed ? (
-        <div
-          style={{ backgroundColor: '#DFEDEF', paddingLeft: '10px', paddingBottom: '10px' }}
-        >
+      {!readOnly && !confirmed ? (
+        <div style={{ backgroundColor: '#DFEDEF', paddingLeft: '10px', paddingBottom: '10px' }}>
           <AddCircle
             style={{
               border: 'thin solid',
               borderRadius: '40px',
               width: '16px',
               height: '16px',
+              cursor: 'pointer',
             }}
             onClick={handleAddFilter}
             disabled={readOnly || confirmed}
@@ -173,9 +202,10 @@ function AdvancedFiltersDialog({
             {formatMessage(intl, 'payroll', 'payroll.advancedFilters.button.addFilters')}
           </Button>
         </div>
-      ) : (<></>) }
+      ) : null}
+
       <div>
-        { !readOnly && !confirmed ? (
+        {!readOnly && !confirmed ? (
           <>
             <div style={{ float: 'left' }}>
               <Button
@@ -188,10 +218,11 @@ function AdvancedFiltersDialog({
                 {formatMessage(intl, 'payroll', 'payroll.advancedFilters.button.clearAllFilters')}
               </Button>
             </div>
-            <div style={{
-              float: 'right',
-              paddingRight: '16px',
-            }}
+            <div
+              style={{
+                float: 'right',
+                paddingRight: '16px',
+              }}
             >
               <Button
                 onClick={saveCriteria}
@@ -204,14 +235,17 @@ function AdvancedFiltersDialog({
               </Button>
             </div>
           </>
-        ) : <></> }
+        ) : null}
       </div>
     </>
   );
 }
 
 const mapStateToProps = (state, props) => ({
-  rights: !!state.core && !!state.core.user && !!state.core.user.i_user ? state.core.user.i_user.rights : [],
+  rights:
+    !!state.core && !!state.core.user && !!state.core.user.i_user
+      ? state.core.user.i_user.rights
+      : [],
   confirmed: state.core.confirmed,
   fetchingCustomFilters: state.core.fetchingCustomFilters,
   errorCustomFilters: state.core.errorCustomFilters,
@@ -219,9 +253,13 @@ const mapStateToProps = (state, props) => ({
   customFilters: state.core.customFilters,
 });
 
-const mapDispatchToProps = (dispatch) => bindActionCreators({
-  fetchCustomFilter,
-}, dispatch);
+const mapDispatchToProps = (dispatch) =>
+  bindActionCreators(
+    {
+      fetchCustomFilter,
+    },
+    dispatch,
+  );
 
 export default injectIntl(
   withTheme(withStyles(styles)(connect(mapStateToProps, mapDispatchToProps)(AdvancedFiltersDialog))),
