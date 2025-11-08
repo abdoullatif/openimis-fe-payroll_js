@@ -9,6 +9,7 @@ import {
   Searcher,
   useModulesManager,
   useTranslations,
+  useToast,
 } from '@openimis/fe-core';
 import {
   DEFAULT_PAGE_SIZE, MODULE_NAME,
@@ -29,6 +30,7 @@ function PayrollPaymentFilesSearcher({
   payrollUuid,
 }) {
   const modulesManager = useModulesManager();
+  const toast = useToast();
   const { formatMessage, formatMessageWithValues } = useTranslations(MODULE_NAME, modulesManager);
 
   const headers = () => [
@@ -55,8 +57,16 @@ function PayrollPaymentFilesSearcher({
     return filters;
   };
 
-  const download = (payrollId, fileName) => {
-    downloadPayroll(payrollId, fileName, false);
+  const download = async (payrollId, fileName) => {
+    try {
+      await downloadPayroll(payrollId, fileName, false);
+      toast.showSuccess(formatMessage('payroll.summary.download.success') || 'Téléchargement réussi');
+    } catch (error) {
+      console.error('Error downloading reconciliation data:', error);
+      toast.showError(
+        error?.message || formatMessage('payroll.summary.download.error') || 'Erreur lors du téléchargement',
+      );
+    }
   };
 
   const fetchFiles = (params) => fetchPayrollPaymentFiles(modulesManager, params);

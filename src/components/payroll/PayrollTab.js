@@ -5,6 +5,7 @@ import {
   Contributions,
   useModulesManager,
   useTranslations,
+  useToast,
 } from '@openimis/fe-core';
 import { makeStyles } from '@material-ui/styles';
 import Button from '@material-ui/core/Button';
@@ -54,9 +55,19 @@ function PayrollTab({
 
   const modulesManager = useModulesManager();
   const { formatMessage } = useTranslations(MODULE_NAME, modulesManager);
+  const toast = useToast();
 
-  const downloadPayrollData = (payrollUuid, payrollName) => {
-    downloadPayroll(payrollUuid, payrollName);
+  const downloadPayrollData = async () => {
+    try {
+      await downloadPayroll(payrollUuid, payroll?.name);
+      toast.showSuccess(formatMessage('payroll.summary.download.success') || 'Téléchargement réussi');
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error downloading reconciliation data:', error);
+      toast.showError(
+        error?.message || formatMessage('payroll.summary.download.error') || 'Erreur lors du téléchargement',
+      );
+    }
   };
 
   return (
@@ -78,18 +89,18 @@ function PayrollTab({
           </div>
           <div style={{ float: 'right', paddingRight: '16px' }}>
             {payrollUuid && !isPayrollFromFailedInvoices && (
-            <Button
-              onClick={() => downloadPayrollData(payrollUuid, payroll.name)}
-              color="#DFEDEF"
-              className={classes.button}
-              style={{
-                border: '0px',
-                marginTop: '6px',
-                textTransform: 'uppercase',
-              }}
-            >
-              {formatMessage('payroll.summary.download')}
-            </Button>
+              <Button
+                onClick={downloadPayrollData}
+                color="#DFEDEF"
+                className={classes.button}
+                style={{
+                  border: '0px',
+                  marginTop: '6px',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {formatMessage('payroll.summary.download')}
+              </Button>
             )}
             {payrollUuid && payroll?.status === PAYROLL_STATUS.APPROVE_FOR_PAYMENT && payroll.paymentMethod === 'StrategyOfflinePayment'
                 && (

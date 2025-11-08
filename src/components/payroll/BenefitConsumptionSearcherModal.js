@@ -215,7 +215,7 @@ function BenefitConsumptionSearcherModal({
             handlePrint(null, () => payrollPrintTemplateRef.current);
           }}
         >
-          <Typography variant="subtitle1">Print</Typography>
+          <Typography variant="subtitle1">{formatMessage('payroll.tooltip.print')}</Typography>
         </Button>
       </div>
       <div>

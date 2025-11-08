@@ -25,6 +25,7 @@ export const MODULE_NAME = 'payroll';
 export const BENEFIT_CONSUMPTION_LIST_TAB_VALUE = 'benefitConsumptionsTab';
 export const PAYROLL_TASK_TAB_VALUE = 'payrollTaskTab';
 export const PAYROLL_PAYMENT_FILES_TAB_VALUE = 'payrollPaymentFilesTab';
+export const PAYROLL_PAYMENT_REPORTS_TAB_VALUE = 'payrollPaymentReportsTab';
 export const PAYROLL_TABS_LABEL_CONTRIBUTION_KEY = 'payroll.TabPanel.label';
 export const PAYROLL_TABS_PANEL_CONTRIBUTION_KEY = 'payroll.TabPanel.panel';
 

@@ -9,6 +9,7 @@ import {
   useModulesManager,
   useTranslations,
   useHistory,
+  useToast,
 } from '@openimis/fe-core';
 import {
   Paper,
@@ -36,6 +37,7 @@ function PaymentReconcilationSummarytDialog({
 }) {
   const history = useHistory();
   const modulesManager = useModulesManager();
+  const toast = useToast();
   const [payrollUuid] = useState(payrollDetail?.id ?? null);
   const { formatMessage, formatMessageWithValues } = useTranslations(MODULE_NAME, modulesManager);
   const [isOpen, setIsOpen] = useState(false);
@@ -43,6 +45,7 @@ function PaymentReconcilationSummarytDialog({
   const [selectedBeneficiaries, setSelectedBeneficiaries] = useState(0);
   const [totalBillAmount, setTotalBillAmount] = useState(0);
   const [totalReconciledBillAmount, setTotalReconciledBillAmount] = useState(0);
+  const [downloading, setDownloading] = useState(false);
 
   const handleOpen = () => {
     if (payrollUuid) {
@@ -93,8 +96,19 @@ function PaymentReconcilationSummarytDialog({
     }
   }, [isOpen, payroll]);
 
-  const downloadPayrollData = (payrollUuid, payrollName) => {
-    downloadPayroll(payrollUuid, payrollName);
+  const downloadPayrollData = async (payrollUuid, payrollName) => {
+    setDownloading(true);
+    try {
+      await downloadPayroll(payrollUuid, payrollName);
+      toast.showSuccess(formatMessage('payroll.summary.download.success') || 'Téléchargement réussi');
+    } catch (error) {
+      console.error('Error downloading reconciliation data:', error);
+      toast.showError(
+        error?.message || formatMessage('payroll.summary.download.error') || 'Erreur lors du téléchargement',
+      );
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -194,12 +208,13 @@ function PaymentReconcilationSummarytDialog({
                 onClick={() => downloadPayrollData(payrollDetail.id, payrollDetail.name)}
                 variant="contained"
                 color="primary"
+                disabled={downloading}
                 style={{
                   margin: '0 16px',
                   marginBottom: '15px',
                 }}
               >
-                {formatMessage('payroll.summary.download')}
+                {downloading ? (formatMessage('payroll.summary.downloading') || 'Téléchargement...') : formatMessage('payroll.summary.download')}
               </Button>
             </div>
             <div style={{

@@ -32,7 +32,7 @@ function BenefitConsumptionSearcher({
   payrollUuid,
 }) {
   const modulesManager = useModulesManager();
-  const { formatMessageWithValues } = useTranslations('payroll', modulesManager);
+  const { formatMessage, formatMessageWithValues } = useTranslations('payroll', modulesManager);
   const payrollPrintTemplateRef = useRef(null);
 
   const handlePrint = useReactToPrint({
@@ -152,7 +152,7 @@ function BenefitConsumptionSearcher({
             handlePrint(null, () => payrollPrintTemplateRef.current);
           }}
         >
-          <Typography variant="subtitle1">Print</Typography>
+          <Typography variant="subtitle1">{formatMessage('payroll.tooltip.print')}</Typography>
         </Button>
       </div>
       <div>

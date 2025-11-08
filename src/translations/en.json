@@ -66,6 +66,8 @@
     "payroll.tooltip.save": "Save",
     "payroll.tooltip.delete": "Delete",
     "payroll.tooltip.download": "Download",
+    "payroll.tooltip.print": "Print",
+    
 
     "payroll.advancedFilters": "Advanced Filters",
     "payroll.advancedFilters.field": "Field",
@@ -85,6 +87,7 @@
     "payroll.payroll.payrollStatusPicker.APPROVE_FOR_PAYMENT": "APPROVE FOR PAYMENT",
     "payroll.payroll.payrollStatusPicker.REJECTED": "REJECTED",
     "payroll.payroll.payrollStatusPicker.RECONCILED": "RECONCILED",
+    "payroll.payroll.payrollStatusPicker.RECONCILIATED": "RECONCILED",
     "payroll.paymentMethod": "Payment Method",
     "payroll.tasks.update.title": "Approve Payroll Tasks",
     "payroll.tasks.reconciliation.title": "Payroll Reconciliation Tasks",
@@ -152,5 +155,40 @@
     "payroll.additonalFields.label": "Additional Fields",
     "payroll.additonalFields.showAdditionalFields": "Show Additional Fields",
     "payroll.additonalFields.close": "Close",
-    "payroll.summaryUpload": "Summary Upload"
+    "payroll.summaryUpload": "Summary Upload",
+    
+    "payroll.export.dialog.title": "Export Payroll",
+    "payroll.export.format": "Export Format",
+    "payroll.export.format.csv": "CSV",
+    "payroll.export.format.xlsx": "XLSX",
+    "payroll.export.format.helper": "Select the format for the export file",
+    "payroll.export.export": "Export",
+    "payroll.export.exporting": "Exporting...",
+    "payroll.export.cancel": "Cancel",
+    "payroll.export.success": "Export completed successfully",
+    "payroll.export.error": "Export failed",
+    
+    "payroll.PayrollPaymentReportsTab.label": "Payment Reports",
+    "payroll.PayrollPaymentReportsTab.title": "Payment Reports",
+    "payroll.PayrollPaymentReportsTab.upload": "Upload PDF",
+    "payroll.PayrollPaymentReportsTab.uploading": "Uploading...",
+    "payroll.PayrollPaymentReportsTab.download": "Download",
+    "payroll.PayrollPaymentReportsTab.table.fileName": "File Name",
+    "payroll.PayrollPaymentReportsTab.table.dateCreated": "Date Created",
+    "payroll.PayrollPaymentReportsTab.table.uploadedBy": "Uploaded By",
+    "payroll.PayrollPaymentReportsTab.table.actions": "Actions",
+    "payroll.PayrollPaymentReportsTab.noReports": "No payment reports available",
+    "payroll.PayrollPaymentReportsTab.success.upload": "Payment report uploaded successfully",
+    "payroll.PayrollPaymentReportsTab.success.download": "Payment report downloaded successfully",
+    "payroll.PayrollPaymentReportsTab.error.upload": "Failed to upload payment report",
+    "payroll.PayrollPaymentReportsTab.error.download": "Failed to download payment report",
+    "payroll.PayrollPaymentReportsTab.error.loading": "Failed to load payment reports",
+    "payroll.PayrollPaymentReportsTab.error.invalidFile": "Only PDF files are allowed",
+    
+    "payroll.reconciliation.close.disabled": "Cannot close reconciliation: payment reports are required",
+    "payroll.reconciliation.close.error": "Payment reports are required before closing reconciliation",
+    
+    "payroll.summary.download.success": "Reconciliation data downloaded successfully",
+    "payroll.summary.download.error": "Error downloading reconciliation data",
+    "payroll.summary.downloading": "Downloading..."
 }
