@@ -134,7 +134,8 @@ class PayrollHeadPanel extends FormPanel {
               value={payroll?.name}
               required
               onChange={(name) => this.updateAttribute('name', name)}
-              readOnly={isPayrollFromFailedInvoices || readOnly}
+              // En mode "à partir des factures échouées", on veut pouvoir modifier le nom
+              readOnly={readOnly}
             />
           </Grid>
 
@@ -177,7 +178,8 @@ class PayrollHeadPanel extends FormPanel {
                 this.updateAttribute('paymentCycle', paymentCycle)
               }
               value={payroll?.paymentCycle}
-              readOnly={isPayrollFromFailedInvoices || readOnly}
+              // En mode "à partir des factures échouées", on veut pouvoir modifier le cycle
+              readOnly={readOnly}
             />
           </Grid>
 

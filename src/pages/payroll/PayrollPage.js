@@ -103,7 +103,10 @@ function PayrollPage({
 
   useEffect(() => {
     if (payroll) {
-      setReadOnly(payroll?.id);
+      // Un payroll existant est en lecture seule,
+      // sauf dans le cas particulier de création à partir des factures échouées
+      // où l'on veut justement créer un NOUVEAU payroll modifiable.
+      setReadOnly(isPayrollFromFailedInvoices ? false : !!payroll?.id);
       if (isPayrollFromFailedInvoices) {
         setEditedPayroll({
           ...payroll, id: null, name: null, paymentCycle: null, status: null, fromFailedInvoicesPayrollId: payroll?.id,
