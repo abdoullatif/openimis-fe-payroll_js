@@ -18,8 +18,9 @@ import {
 import PhotoCameraOutlinedIcon from '@material-ui/icons/PhotoCameraOutlined';
 import { fetchBenefitAttachments, deleteBenefitConsumption } from '../../actions';
 import {
-  DEFAULT_PAGE_SIZE, ROWS_PER_PAGE_OPTIONS, PAYROLL_STATUS,
+  DEFAULT_PAGE_SIZE, ROWS_PER_PAGE_OPTIONS, PAYROLL_STATUS, BENEFIT_CONSUMPTION_STATUS,
 } from '../../constants';
+import { benefitHasGatewayReconciliationFailure } from '../../utils/payrollWorkflow';
 import BenefitConsumptionFilterModal from './BenefitConsumptionFilterModal';
 import ErrorSummaryModal from './dialogs/ErrorSummaryModal';
 import { mutationLabel } from '../../utils/string-utils';
@@ -161,18 +162,26 @@ function BenefitConsumptionSearcherModal({
         {formatMessage('payroll.summary.confirm')}
       </Button>
     ),
-    (benefitAttachment) => (
-      payrollDetail.paymentMethod === 'StrategyOnlinePayment' && payrollDetail.status === PAYROLL_STATUS.RECONCILED
-        && benefitAttachment.benefit.status !== 'RECONCILED' && (
-          <Button
-            onClick={() => setSelectedBenefitAttachment(benefitAttachment)}
-            variant="contained"
-            style={{ backgroundColor: '#b80000', color: 'white' }}
-          >
-            {formatMessage('payroll.summary.benefit_error')}
-          </Button>
-      )
-    ),
+    (benefitAttachment) => {
+      const benefit = benefitAttachment?.benefit;
+      const showGatewayError = payrollDetail.paymentMethod === 'StrategyOnlinePayment'
+        && (
+          benefitHasGatewayReconciliationFailure(benefit)
+          || (
+            payrollDetail.status === PAYROLL_STATUS.RECONCILED
+            && benefit?.status !== BENEFIT_CONSUMPTION_STATUS.RECONCILED
+          )
+        );
+      return showGatewayError ? (
+        <Button
+          onClick={() => setSelectedBenefitAttachment(benefitAttachment)}
+          variant="contained"
+          style={{ backgroundColor: '#b80000', color: 'white' }}
+        >
+          {formatMessage('payroll.summary.benefit_error')}
+        </Button>
+      ) : null;
+    },
     (benefitAttachment) => (
       payrollDetail.status === PAYROLL_STATUS.PENDING_APPROVAL
       && benefitAttachment.benefit.status !== 'PENDING_DELETION' && (

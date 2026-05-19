@@ -106,3 +106,10 @@ export const PAYROLL_PAYMENT_FILE_STATUS_LIST = [
 export const BENEFIT_PLAN_CONTENT_TYPE_ID = 175;
 
 export const PAYROLL_FROM_FAILED_INVOICES_URL_PARAM = 'createPayrollFromFailedInvoices=true';
+
+export const PAYMENT_METHOD_ONLINE = 'StrategyOnlinePayment';
+export const PAYMENT_METHOD_OFFLINE = 'StrategyOfflinePayment';
+export const PAYROLL_RECONCILIATION_BUSINESS_EVENT = 'payroll.payroll_reconciliation';
+export const PAYROLL_RECONCILIATION_TASK_SOURCE = 'payroll_reconciliation';
+export const RECONCILIATION_LOCK_TASK_STATUSES = ['RECEIVED', 'ACCEPTED', 'COMPLETED'];
+export const PAYROLL_WORKFLOW_POLL_INTERVAL_MS = 2500;

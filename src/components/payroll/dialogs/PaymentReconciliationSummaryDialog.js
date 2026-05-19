@@ -23,7 +23,12 @@ import {
   BENEFIT_CONSUMPTION_STATUS,
   PAYROLL_PAYROLL_ROUTE,
   PAYROLL_FROM_FAILED_INVOICES_URL_PARAM,
+  PAYROLL_STATUS,
 } from '../../../constants';
+import {
+  computeBenefitWorkflowState,
+  getBenefitsFromPayroll,
+} from '../../../utils/payrollWorkflow';
 import downloadPayroll from '../../../utils/export';
 
 import BenefitConsumptionSearcherModal from '../BenefitConsumptionSearcherModal';
@@ -95,6 +100,11 @@ function PaymentReconcilationSummarytDialog({
       setTotalReconciledBillAmount(reconciledAmount);
     }
   }, [isOpen, payroll]);
+
+  const benefits = getBenefitsFromPayroll(payroll);
+  const { hasUnreconciledBenefits } = computeBenefitWorkflowState(benefits);
+  const canCreateFailedInvoices = payrollDetail?.status === PAYROLL_STATUS.RECONCILED
+    && hasUnreconciledBenefits;
 
   const downloadPayrollData = async (payrollUuid, payrollName) => {
     setDownloading(true);
@@ -196,7 +206,12 @@ function PaymentReconcilationSummarytDialog({
                 onClick={handleCreatePaymentForFailedInvoice}
                 variant="contained"
                 color="primary"
-                disabled={totalBeneficiaries === selectedBeneficiaries}
+                disabled={!canCreateFailedInvoices}
+                title={
+                  !canCreateFailedInvoices
+                    ? formatMessage('payroll.summary.createPaymentForFailedInvoice.disabled')
+                    : ''
+                }
                 style={{
                   margin: '0 16px',
                   marginBottom: '15px',

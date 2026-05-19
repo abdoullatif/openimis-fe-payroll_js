@@ -67,12 +67,18 @@ const PAYROLL_PROJECTION = (modulesManager) => [
   `paymentPoint { ${PAYMENT_POINT_PROJECTION(modulesManager).join(' ')} }`,
   'paymentCycle { code, startDate, endDate }',
   // eslint-disable-next-line max-len
-  'benefitConsumption{id, status, code, dateDue, receipt, individual {firstName, lastName}, benefitAttachment{bill{id, code, terms, amountTotal}}}',
+  'benefitConsumption{id, status, code, dateDue, receipt, jsonExt, individual {firstName, lastName}, benefitAttachment{bill{id, code, terms, amountTotal}}}',
   'jsonExt',
   'status',
   'dateValidFrom',
   'dateValidTo',
   'isDeleted',
+  'reconciliationInProgress',
+  'reconciliationLastCompletedAt',
+  'reconciliationLastSummary',
+  'reconciledBenefitCount',
+  'canClosePayroll',
+  'closePayrollBlockers',
 ];
 
 const PAYROLL_SEARCHER_PROJECTION = (modulesManager) => [
@@ -310,6 +316,16 @@ export function makePaymentForPayroll(payroll, clientMutationLabel) {
     MUTATION_SERVICE.PAYROLL.MAKE_PAYMENT,
     payrollUuids,
     ACTION_TYPE.MAKE_PAYMENT_PAYROLL,
+    clientMutationLabel,
+  );
+}
+
+export function triggerPayrollReconciliation(payroll, clientMutationLabel) {
+  const payrollUuids = `ids: ["${payroll?.id}"]`;
+  return PERFORM_MUTATION(
+    MUTATION_SERVICE.PAYROLL.TRIGGER_RECONCILIATION,
+    payrollUuids,
+    ACTION_TYPE.TRIGGER_PAYROLL_RECONCILIATION,
     clientMutationLabel,
   );
 }
