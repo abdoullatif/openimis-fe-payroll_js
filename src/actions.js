@@ -3,6 +3,7 @@ import {
   decodeId,
   formatGQLString,
   formatMutation,
+  formatPageQuery,
   formatPageQueryWithCount,
   formatQuery,
   graphql,
@@ -13,6 +14,7 @@ import {
   CLEAR, ERROR, REQUEST, SUCCESS,
 } from './utils/action-type';
 import { isBase64Encoded } from './utils/advanced-filters-utils';
+import { generateClientMutationId } from './utils/payrollCreationProgress';
 import { PAYROLL_STATUS } from './constants';
 
 export const PAYMENT_POINT_PROJECTION = (modulesManager) => [
@@ -74,12 +76,27 @@ const PAYROLL_PROJECTION = (modulesManager) => [
   'dateValidTo',
   'isDeleted',
   'reconciliationInProgress',
+  'paymentInProgress',
+  'reconciliationLocked',
+  'hasPaymentReport',
   'reconciliationLastCompletedAt',
   'reconciliationLastSummary',
   'reconciledBenefitCount',
+  'beneficesTrouves',
+  'beneficiairesSelectionnes',
+  'benefitConsumptionTotalCount',
+  'benefitConsumptionTruncated',
+  'reconciliationRecap',
   'canClosePayroll',
   'closePayrollBlockers',
+  'creationProgress',
+  'paymentProgress',
+  'reconciliationProgress',
+  'paymentApprovedModalSummary',
 ];
+
+/** Champs légers pour le polling opérations (même liste — pas de grosses listes). */
+export const PAYROLL_PROGRESS_PROJECTION = (modulesManager) => PAYROLL_PROJECTION(modulesManager);
 
 const PAYROLL_SEARCHER_PROJECTION = (modulesManager) => [
   'id',
@@ -143,8 +160,47 @@ const formatPayrollGQL = (payroll) => `
 }
   `;
 
-const PERFORM_MUTATION = (mutationType, mutationInput, ACTION, clientMutationLabel) => {
-  const mutation = formatMutation(mutationType, mutationInput, clientMutationLabel);
+/**
+ * Same as fe-core formatMutation but allows a fixed clientMutationId (for payroll creation progress).
+ */
+function formatMutationWithClientMutationId(
+  operationName,
+  input,
+  clientMutationLabel,
+  clientMutationId,
+) {
+  const id = clientMutationId || generateClientMutationId();
+  const payload = `
+    mutation {
+      ${operationName}(
+        input: {
+          clientMutationId: "${id}"
+          clientMutationLabel: "${clientMutationLabel}"
+          ${input.trim()}
+        }
+      ) {
+        clientMutationId
+        internalId
+      }
+    }`;
+  return { clientMutationId: id, payload };
+}
+
+const PERFORM_MUTATION = (
+  mutationType,
+  mutationInput,
+  ACTION,
+  clientMutationLabel,
+  fixedClientMutationId = null,
+) => {
+  const mutation = fixedClientMutationId
+    ? formatMutationWithClientMutationId(
+      mutationType,
+      mutationInput,
+      clientMutationLabel,
+      fixedClientMutationId,
+    )
+    : formatMutation(mutationType, mutationInput, clientMutationLabel);
   const requestedDateTime = new Date();
   return graphql(
     mutation.payload,
@@ -245,6 +301,7 @@ export function createPayroll(payroll, clientMutationLabel) {
     formatPayrollGQL(payroll),
     ACTION_TYPE.CREATE_PAYROLL,
     clientMutationLabel,
+    payroll?.clientMutationId ?? null,
   );
 }
 
@@ -310,22 +367,75 @@ export function rejectPayroll(payroll, clientMutationLabel) {
   );
 }
 
-export function makePaymentForPayroll(payroll, clientMutationLabel) {
-  const payrollUuids = `ids: ["${payroll?.id}"]`;
+export function makePaymentForPayroll(payroll, clientMutationLabel, clientMutationId = null) {
+  const uuid = isBase64Encoded(payroll?.id) ? decodeId(payroll?.id) : payroll?.id;
+  const payrollUuids = `ids: ["${uuid}"]`;
   return PERFORM_MUTATION(
     MUTATION_SERVICE.PAYROLL.MAKE_PAYMENT,
     payrollUuids,
     ACTION_TYPE.MAKE_PAYMENT_PAYROLL,
     clientMutationLabel,
+    clientMutationId,
   );
 }
 
-export function triggerPayrollReconciliation(payroll, clientMutationLabel) {
-  const payrollUuids = `ids: ["${payroll?.id}"]`;
+export function triggerPayrollReconciliation(payroll, clientMutationLabel, clientMutationId = null) {
+  const uuid = isBase64Encoded(payroll?.id) ? decodeId(payroll?.id) : payroll?.id;
+  const payrollUuids = `ids: ["${uuid}"]`;
   return PERFORM_MUTATION(
     MUTATION_SERVICE.PAYROLL.TRIGGER_RECONCILIATION,
     payrollUuids,
     ACTION_TYPE.TRIGGER_PAYROLL_RECONCILIATION,
     clientMutationLabel,
+    clientMutationId,
+  );
+}
+
+export function cancelPayrollPayment(payroll, clientMutationLabel, reason = '', clientMutationId = null) {
+  const uuid = isBase64Encoded(payroll?.id) ? decodeId(payroll?.id) : payroll?.id;
+  const reasonPart = reason ? `reason: "${formatGQLString(reason)}"` : '';
+  const payrollUuids = `ids: ["${uuid}"]`;
+  return PERFORM_MUTATION(
+    MUTATION_SERVICE.PAYROLL.CANCEL_PAYMENT,
+    `${payrollUuids} ${reasonPart}`,
+    ACTION_TYPE.CANCEL_PAYROLL_PAYMENT,
+    clientMutationLabel,
+    clientMutationId,
+  );
+}
+
+export function fetchPayrollFilterSuggestions(search) {
+  const payload = formatPageQuery(
+    'payroll',
+    [
+      'first: 15',
+      'isDeleted: false',
+      `name_Icontains: "${formatGQLString(search)}"`,
+    ],
+    ['id', 'name', 'paymentPlan { code name }'],
+  );
+  return (dispatch) => graphql(payload, 'PAYROLL_FILTER_SUGGESTIONS')(
+    dispatch,
+  ).then((action) => {
+    if (action?.error || action?.payload?.errors) return [];
+    const edges = action?.payload?.data?.payroll?.edges ?? [];
+    return edges.map(({ node }) => {
+      const planCode = node?.paymentPlan?.code ?? '';
+      const label = planCode ? `${node.name} (${planCode})` : node.name;
+      return { label, value: node.name };
+    });
+  });
+}
+
+export function cancelPayrollReconciliation(payroll, clientMutationLabel, reason = '', clientMutationId = null) {
+  const uuid = isBase64Encoded(payroll?.id) ? decodeId(payroll?.id) : payroll?.id;
+  const reasonPart = reason ? `reason: "${formatGQLString(reason)}"` : '';
+  const payrollUuids = `ids: ["${uuid}"]`;
+  return PERFORM_MUTATION(
+    MUTATION_SERVICE.PAYROLL.CANCEL_RECONCILIATION,
+    `${payrollUuids} ${reasonPart}`,
+    ACTION_TYPE.CANCEL_PAYROLL_RECONCILIATION,
+    clientMutationLabel,
+    clientMutationId,
   );
 }

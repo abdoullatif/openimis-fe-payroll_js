@@ -11,7 +11,11 @@ export const RIGHT_PAYMENT_POINT_UPDATE = 201003;
 export const RIGHT_PAYMENT_POINT_DELETE = 201004;
 
 export const DEFAULT_DEBOUNCE_TIME = 500;
+export const FILTER_SUGGESTION_DEBOUNCE_MS = 300;
+export const FILTER_SUGGESTION_MIN_LENGTH = 2;
 export const DEFAULT_PAGE_SIZE = 10;
+/** Modale paiements approuvés — pagination serveur */
+export const APPROVED_PAYMENTS_PAGE_SIZE = 25;
 export const CONTAINS_LOOKUP = 'Icontains';
 export const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
 export const EMPTY_STRING = '';
@@ -112,4 +116,5 @@ export const PAYMENT_METHOD_OFFLINE = 'StrategyOfflinePayment';
 export const PAYROLL_RECONCILIATION_BUSINESS_EVENT = 'payroll.payroll_reconciliation';
 export const PAYROLL_RECONCILIATION_TASK_SOURCE = 'payroll_reconciliation';
 export const RECONCILIATION_LOCK_TASK_STATUSES = ['RECEIVED', 'ACCEPTED', 'COMPLETED'];
-export const PAYROLL_WORKFLOW_POLL_INTERVAL_MS = 2500;
+export const PAYROLL_WORKFLOW_POLL_INTERVAL_MS = 3000;
+export const PAYROLL_CREATION_POLL_INTERVAL_MS = 500;

@@ -13,6 +13,7 @@ import {
 } from '@openimis/fe-core';
 import AdvancedFiltersDialog from './AdvancedFiltersDialog';
 import { CLEARED_STATE_FILTER } from '../../constants';
+import { resolveBenefitPlanFromPaymentPlan } from '../../utils/advanced-filters-utils';
 import PayrollStatusPicker from './PayrollStatusPicker';
 import PaymentMethodPicker from '../../pickers/PaymentMethodPicker';
 
@@ -28,8 +29,8 @@ class PayrollHeadPanel extends FormPanel {
   constructor(props) {
     super(props);
     this.state = {
-      appliedCustomFilters: [CLEARED_STATE_FILTER],
-      appliedFiltersRowStructure: [CLEARED_STATE_FILTER],
+      appliedCustomFilters: [],
+      appliedFiltersRowStructure: [],
     };
   }
 
@@ -37,15 +38,23 @@ class PayrollHeadPanel extends FormPanel {
     this.setStateFromProps(this.props);
   }
 
+  componentDidUpdate(prevProps) {
+    super.componentDidUpdate(prevProps);
+    if (prevProps.edited?.jsonExt !== this.props.edited?.jsonExt) {
+      this.setStateFromProps(this.props);
+    }
+  }
+
   setStateFromProps = (props) => {
     const { jsonExt } = props?.edited ?? {};
-    if (jsonExt) {
-      const filters = this.getDefaultAppliedCustomFilters(jsonExt);
-      this.setState({
-        appliedCustomFilters: filters,
-        appliedFiltersRowStructure: filters,
-      });
+    if (!jsonExt) {
+      return;
     }
+    const filters = this.getDefaultAppliedCustomFilters(jsonExt);
+    this.setState({
+      appliedCustomFilters: filters,
+      appliedFiltersRowStructure: filters,
+    });
   };
 
   updateJsonExt = (value) => {
@@ -77,11 +86,15 @@ class PayrollHeadPanel extends FormPanel {
 
         let parsedValue = value;
         if (typeof value === 'string') {
-          // tente de parser JSON si la valeur est sérialisée
-          try {
-            parsedValue = JSON.parse(value);
-          } catch (e) {
-            parsedValue = value; // simple string
+          const trimmed = value.trim();
+          if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+            try {
+              parsedValue = JSON.parse(trimmed);
+            } catch (e) {
+              parsedValue = value;
+            }
+          } else {
+            parsedValue = value;
           }
         }
 
@@ -255,11 +268,7 @@ class PayrollHeadPanel extends FormPanel {
             <Divider />
             <Grid container className={classes.item}>
               <AdvancedFiltersDialog
-                object={
-                  payroll?.paymentPlan?.benefitPlan
-                    ? JSON.parse(JSON.parse(payroll.paymentPlan.benefitPlan))
-                    : null
-                }
+                object={resolveBenefitPlanFromPaymentPlan(payroll?.paymentPlan)}
                 objectToSave={payroll}
                 moduleName="social_protection"
                 objectType="BenefitPlan"
@@ -270,8 +279,8 @@ class PayrollHeadPanel extends FormPanel {
                   this.setAppliedFiltersRowStructure
                 }
                 updateAttributes={this.updateJsonExt}
-                getDefaultAppliedCustomFilters={() =>
-                  this.getDefaultAppliedCustomFilters(payroll.jsonExt)
+                getDefaultAppliedCustomFilters={(jsonExt) =>
+                  this.getDefaultAppliedCustomFilters(jsonExt ?? payroll.jsonExt)
                 }
                 readOnly={readOnly}
                 edited={this.props.edited}

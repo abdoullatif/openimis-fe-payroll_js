@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
+  Collapse,
   Grid,
+  IconButton,
   Paper,
   Table,
   TableBody,
@@ -11,13 +13,14 @@ import {
   TableRow,
   Typography,
 } from '@material-ui/core';
+import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
+import ExpandLessIcon from '@material-ui/icons/ExpandLess';
 import { makeStyles } from '@material-ui/styles';
 import { useModulesManager, useTranslations } from '@openimis/fe-core';
 import { MODULE_NAME } from '../../constants';
-import {
-  asArray,
-  parseTaskReconciliationBusinessData,
-} from '../../utils/parseTaskReconciliationBusinessData';
+import { parseTaskReconciliationBusinessData } from '../../utils/parseTaskReconciliationBusinessData';
+import { asArray, hasDisplayValue } from '../../utils/taskBusinessDataUtils';
+import TaskTruncatedListAlert from './TaskTruncatedListAlert';
 
 const useStyles = makeStyles(() => ({
   paper: {
@@ -40,6 +43,18 @@ const useStyles = makeStyles(() => ({
   tableScrollContainer: {
     maxHeight: 320,
     overflowY: 'auto',
+  },
+  textRecap: {
+    whiteSpace: 'pre-wrap',
+    margin: 0,
+    fontFamily: 'inherit',
+    fontSize: '0.875rem',
+  },
+  expandHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    cursor: 'pointer',
+    userSelect: 'none',
   },
 }));
 
@@ -83,8 +98,10 @@ function InvoiceTable({ title, rows, emptyLabel }) {
               </TableRow>
             ) : (
               list.map((row, index) => (
-                <TableRow key={`${row.facture || row.code || index}-${index}`}>
-                  <TableCell>{row.facture ?? row.code ?? row.invoice ?? '—'}</TableCell>
+                <TableRow key={`${row.code_facture || row.facture || row.code || index}-${index}`}>
+                  <TableCell>
+                    {row.code_facture ?? row.facture ?? row.code ?? row.invoice ?? '—'}
+                  </TableCell>
                   <TableCell align="right">{row.montant ?? row.amount ?? '—'}</TableCell>
                   <TableCell>{row.recu ?? row.receipt ?? row.receipt_number ?? '—'}</TableCell>
                   <TableCell>{row.source ?? '—'}</TableCell>
@@ -102,9 +119,11 @@ function PayrollReconciliationTaskRecap({ incomingData }) {
   const classes = useStyles();
   const modulesManager = useModulesManager();
   const { formatMessage, formatMessageWithValues } = useTranslations(MODULE_NAME, modulesManager);
+  const [recapExpanded, setRecapExpanded] = useState(false);
   const { incoming, recap } = parseTaskReconciliationBusinessData(incomingData);
 
   const payrollName = incoming.payroll ?? recap.payroll_name ?? incoming.payroll_name ?? '—';
+  const textRecap = incoming.recapitulatif_reconciliation;
   const payrollId = incoming.payroll_id ?? recap.payroll_id ?? incoming.id;
 
   const totalInvoices = incoming.total_factures ?? recap.total_invoices ?? recap.total_factures;
@@ -196,6 +215,8 @@ function PayrollReconciliationTaskRecap({ incomingData }) {
         </Typography>
       )}
 
+      <TaskTruncatedListAlert incoming={incoming} />
+
       <InvoiceTable
         title={formatMessage('payroll.tasks.reconciliation.reconciledDetails')}
         rows={reconciledRows}
@@ -207,6 +228,34 @@ function PayrollReconciliationTaskRecap({ incomingData }) {
         rows={pendingRows}
         emptyLabel={formatMessage('payroll.tasks.reconciliation.noPendingInvoices')}
       />
+
+      {hasDisplayValue(textRecap) && (
+        <Box mt={2}>
+          <div
+            className={classes.expandHeader}
+            onClick={() => setRecapExpanded((prev) => !prev)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                setRecapExpanded((prev) => !prev);
+              }
+            }}
+          >
+            <Typography className={classes.sectionTitle}>
+              {formatMessage('payroll.tasks.reconciliation.textRecap')}
+            </Typography>
+            <IconButton size="small" aria-label="toggle recap">
+              {recapExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </IconButton>
+          </div>
+          <Collapse in={recapExpanded}>
+            <Paper elevation={1} style={{ padding: 12 }}>
+              <pre className={classes.textRecap}>{textRecap}</pre>
+            </Paper>
+          </Collapse>
+        </Box>
+      )}
     </Box>
   );
 }

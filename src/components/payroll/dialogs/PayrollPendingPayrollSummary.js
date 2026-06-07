@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import Button from '@material-ui/core/Button';
 import Dialog from '@material-ui/core/Dialog';
 import DialogActions from '@material-ui/core/DialogActions';
@@ -10,39 +10,49 @@ import {
   useTranslations,
   useToast,
 } from '@openimis/fe-core';
-import {
-  Paper,
-  Grid,
-} from '@material-ui/core';
-import Typography from '@material-ui/core/Typography';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
-import { MODULE_NAME, BENEFIT_CONSUMPTION_STATUS } from '../../../constants';
+import { MODULE_NAME } from '../../../constants';
 import BenefitConsumptionSearcherModal from '../BenefitConsumptionSearcherModal';
+import PayrollModalSummaryCards from '../PayrollModalSummaryCards';
 import downloadPayroll from '../../../utils/export';
 import { fetchPayroll } from '../../../actions';
+import { fetchPayrollSummaryThunk } from '../../../services/payrollApprovedPaymentModalService';
 
 function PaymentPendingPayrollPaymentDialog({
   classes,
   payroll,
   fetchPayroll,
   payrollDetail,
+  dispatch,
 }) {
   const modulesManager = useModulesManager();
   const toast = useToast();
-  const [payrollUuid] = useState(payrollDetail?.id ?? null);
+  const payrollUuid = payrollDetail?.id ?? null;
   const [isOpen, setIsOpen] = useState(false);
-  const [totalBeneficiaries, setTotalBeneficiaries] = useState(0);
-  const [selectedBeneficiaries, setSelectedBeneficiaries] = useState(0);
-  const [totalBillAmount, setTotalBillAmount] = useState(0);
-  const [totalReconciledBillAmount, setTotalReconciledBillAmount] = useState(0);
+  const [modalSummary, setModalSummary] = useState(null);
   const [downloading, setDownloading] = useState(false);
 
+  const mergedPayroll = useMemo(
+    () => ({ ...payroll, ...modalSummary }),
+    [payroll, modalSummary],
+  );
+
+  const loadModalSummary = useCallback(() => {
+    if (!payrollUuid) return Promise.resolve(null);
+    return dispatch(fetchPayrollSummaryThunk(payrollUuid))
+      .then((row) => {
+        if (row) setModalSummary(row);
+        return row;
+      });
+  }, [dispatch, payrollUuid]);
+
   const handleOpen = () => {
+    setIsOpen(true);
     if (payrollUuid) {
       fetchPayroll(modulesManager, [`id: "${payrollUuid}"`]);
+      loadModalSummary();
     }
-    setIsOpen(true);
   };
 
   const handleClose = () => {
@@ -51,42 +61,10 @@ function PaymentPendingPayrollPaymentDialog({
 
   const { formatMessage, formatMessageWithValues } = useTranslations(MODULE_NAME, modulesManager);
 
-  useEffect(() => {
-    if (isOpen && Object.keys(payroll).length > 0) {
-      // Calculate total benefits and reconciled benefits
-      const total = payroll.benefitConsumption.length;
-      const selected = payroll.benefitConsumption.filter(
-        (benefit) => benefit.status === BENEFIT_CONSUMPTION_STATUS.RECONCILED,
-      ).length;
-
-      setTotalBeneficiaries(total);
-      setSelectedBeneficiaries(selected);
-
-      let totalAmount = 0;
-      let reconciledAmount = 0;
-      if (payroll && payroll.benefitConsumption) {
-        payroll.benefitConsumption.forEach((benefit) => {
-          if (benefit.benefitAttachment && benefit.benefitAttachment.length > 0) {
-            benefit.benefitAttachment.forEach((attachment) => {
-              if (attachment.bill && attachment.bill.amountTotal) {
-                totalAmount += parseFloat(attachment.bill.amountTotal);
-                if (benefit.status === BENEFIT_CONSUMPTION_STATUS.RECONCILED) {
-                  reconciledAmount += parseFloat(attachment.bill.amountTotal);
-                }
-              }
-            });
-          }
-        });
-      }
-      setTotalBillAmount(totalAmount);
-      setTotalReconciledBillAmount(reconciledAmount);
-    }
-  }, [isOpen, payroll]);
-
-  const downloadPayrollData = async (payrollUuid, payrollName) => {
+  const downloadPayrollData = async (id, payrollName) => {
     setDownloading(true);
     try {
-      await downloadPayroll(payrollUuid, payrollName);
+      await downloadPayroll(id, payrollName);
       toast.showSuccess(formatMessage('payroll.summary.download.success') || 'Téléchargement réussi');
     } catch (error) {
       console.error('Error downloading reconciliation data:', error);
@@ -130,38 +108,7 @@ function PaymentPendingPayrollPaymentDialog({
           {formatMessageWithValues('payroll.reconciliationSummary', { payrollName: payrollDetail.name })}
         </DialogTitle>
         <DialogContent>
-          <Grid container spacing={2}>
-            <Grid item xs={4}>
-              <Paper elevation={3} style={{ padding: '20px' }}>
-                <Typography variant="h6" gutterBottom>
-                  {formatMessage('payroll.summary.selectedBeneficiaries')}
-                </Typography>
-                <Typography variant="body1">
-                  {formatMessageWithValues('payroll.summary.beneficiariesCount', { selectedBeneficiaries, totalBeneficiaries })}
-                </Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={4}>
-              <Paper elevation={3} style={{ padding: '20px' }}>
-                <Typography variant="h6" gutterBottom>
-                  {formatMessage('payroll.summary.totalAmountForInvoice')}
-                </Typography>
-                <Typography variant="body1">
-                  {totalBillAmount}
-                </Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={4}>
-              <Paper elevation={3} style={{ padding: '20px' }}>
-                <Typography variant="h6" gutterBottom>
-                  {formatMessage('payroll.summary.deliveredReconciliation')}
-                </Typography>
-                <Typography variant="body1">
-                  {totalReconciledBillAmount}
-                </Typography>
-              </Paper>
-            </Grid>
-          </Grid>
+          <PayrollModalSummaryCards payroll={mergedPayroll} />
           <div
             style={{ backgroundColor: '#DFEDEF' }}
           >
@@ -223,4 +170,7 @@ const mapDispatchToProps = (dispatch) => bindActionCreators({
   fetchPayroll,
 }, dispatch);
 
-export default connect(mapStateToProps, mapDispatchToProps)(PaymentPendingPayrollPaymentDialog);
+export default connect(mapStateToProps, (dispatch) => ({
+  ...mapDispatchToProps(dispatch),
+  dispatch,
+}))(PaymentPendingPayrollPaymentDialog);

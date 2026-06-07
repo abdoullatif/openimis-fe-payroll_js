@@ -1,11 +1,10 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable react/jsx-no-useless-fragment */
 /* eslint-disable no-prototype-builtins */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { injectIntl } from 'react-intl';
 import Button from '@material-ui/core/Button';
 import {
-  decodeId,
   formatMessage,
   fetchCustomFilter,
 } from '@openimis/fe-core';
@@ -13,14 +12,88 @@ import { withTheme, withStyles } from '@material-ui/core/styles';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import AddCircle from '@material-ui/icons/Add';
-import _ from 'lodash';
 import AdvancedFiltersRowValue from './AdvancedFiltersRowValue';
-import { BENEFIT_PLAN, CLEARED_STATE_FILTER } from '../../constants';
-import { isBase64Encoded } from '../../utils/advanced-filters-utils';
+import { CLEARED_STATE_FILTER } from '../../constants';
+import {
+  getBenefitPlanUuid,
+  resolveBenefitPlanFromPaymentPlan,
+} from '../../utils/advanced-filters-utils';
 
 const styles = (theme) => ({
   item: theme.paper.item,
 });
+
+const normalizeFilterValue = (value) => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'object') {
+    return value.name || value.code || value.id || value.value || '';
+  }
+  return String(value);
+};
+
+const buildCustomFilterCondition = ({ field, filter, value, type }) => {
+  if (!field || !filter) return null;
+  const normalizedValue = normalizeFilterValue(value);
+  if (!normalizedValue) return null;
+  const valueType = type || 'string';
+  return `${field}__${filter}__${valueType}=${normalizedValue}`;
+};
+
+const buildSavedCriteriaRows = (filters) => filters
+  .filter(({ field, filter, value }) => field && filter && normalizeFilterValue(value) !== '')
+  .map(({ filter, value, field, type, referential, typeLocation, amount }) => {
+    let safeValue = value ?? '';
+    let resolvedTypeLocation = typeLocation;
+
+    if (typeof safeValue === 'object' && safeValue !== null) {
+      try {
+        safeValue = JSON.stringify(safeValue);
+      } catch (e) {
+        safeValue = '[Unserializable Object]';
+      }
+    }
+
+    if (referential === 'Location' && !resolvedTypeLocation && value?.__typename) {
+      resolvedTypeLocation = value.__typename.replace('GQLType', '');
+    }
+
+    return {
+      amount: amount ?? '',
+      field,
+      filter,
+      type,
+      referential,
+      typeLocation: resolvedTypeLocation,
+      value: safeValue,
+      custom_filter_condition: buildCustomFilterCondition({ field, filter, value, type }),
+    };
+  })
+  .filter((entry) => !!entry.custom_filter_condition);
+
+const getCriteriaFromJsonExt = (jsonExt) => {
+  try {
+    const data = JSON.parse(jsonExt || '{}');
+    const criteria = data?.advanced_criteria;
+    if (Array.isArray(criteria)) return criteria;
+    if (criteria && typeof criteria === 'object') {
+      return criteria.ACTIVE || criteria.active || [];
+    }
+    const byStatus = data?.advanced_criteria_by_status;
+    if (byStatus?.ACTIVE) return byStatus.ACTIVE;
+    return [];
+  } catch {
+    return [];
+  }
+};
+
+const mergeCriteriaIntoJsonExt = (inputJsonExt, savedRows) => {
+  const existingData = JSON.parse(inputJsonExt || '{}');
+  existingData.advanced_criteria = savedRows;
+  existingData.advanced_criteria_by_status = { ACTIVE: savedRows };
+  return JSON.stringify(existingData);
+};
+
+const criteriaRowsEqual = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 
 function AdvancedFiltersDialog({
   intl,
@@ -32,26 +105,48 @@ function AdvancedFiltersDialog({
   moduleName,
   objectType,
   setAppliedCustomFilters,
-  appliedFiltersRowStructure,
   setAppliedFiltersRowStructure,
   updateAttributes,
   getDefaultAppliedCustomFilters,
   readOnly,
   additionalParams,
   confirmed,
-  edited,
 }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const benefitPlan = object ?? resolveBenefitPlanFromPaymentPlan(objectToSave?.paymentPlan);
+  const benefitPlanId = getBenefitPlanUuid(benefitPlan);
+
   const [currentFilter, setCurrentFilter] = useState({
     field: '', filter: '', type: '', value: '', amount: '', referential: '', typeLocation: '',
   });
-  const [filters, setFilters] = useState(getDefaultAppliedCustomFilters(objectToSave.jsonExt));
+  const [filters, setFilters] = useState(() => getDefaultAppliedCustomFilters(objectToSave?.jsonExt));
+  const skipNextSyncRef = useRef(false);
 
   useEffect(() => {
-    setFilters(getDefaultAppliedCustomFilters(objectToSave.jsonExt));
-  }, [objectToSave.jsonExt]);
+    const parsed = getDefaultAppliedCustomFilters(objectToSave?.jsonExt);
+    skipNextSyncRef.current = true;
+    setFilters(parsed.length > 0 ? parsed : []);
+  }, [objectToSave?.jsonExt]);
 
-  useEffect(() => {}, [edited]);
+  useEffect(() => {
+    if (skipNextSyncRef.current) {
+      skipNextSyncRef.current = false;
+      return;
+    }
+    if (!benefitPlanId) {
+      return;
+    }
+
+    const savedRows = buildSavedCriteriaRows(filters);
+    const currentRows = getCriteriaFromJsonExt(objectToSave?.jsonExt);
+    if (criteriaRowsEqual(savedRows, currentRows)) {
+      return;
+    }
+
+    const jsonExt = mergeCriteriaIntoJsonExt(objectToSave?.jsonExt, savedRows);
+    updateAttributes(jsonExt);
+    setAppliedFiltersRowStructure(savedRows);
+    setAppliedCustomFilters(JSON.stringify(savedRows));
+  }, [filters, benefitPlanId]);
 
   const createParams = (moduleName, objectTypeName, uuidOfObject = null, additionalParams = null) => {
     const params = [
@@ -69,14 +164,13 @@ function AdvancedFiltersDialog({
 
   const fetchFilters = (params) => fetchCustomFilter(params);
 
-  const handleClose = () => {
-    setCurrentFilter(CLEARED_STATE_FILTER);
-  };
-
   const handleRemoveFilter = () => {
     setCurrentFilter(CLEARED_STATE_FILTER);
-    setAppliedFiltersRowStructure([CLEARED_STATE_FILTER]);
+    setAppliedFiltersRowStructure([]);
     setFilters([]);
+    const clearedJsonExt = mergeCriteriaIntoJsonExt(objectToSave?.jsonExt, []);
+    updateAttributes(clearedJsonExt);
+    setAppliedCustomFilters(JSON.stringify([]));
   };
 
   const handleAddFilter = () => {
@@ -84,89 +178,22 @@ function AdvancedFiltersDialog({
     setFilters([...filters, CLEARED_STATE_FILTER]);
   };
 
-  /**
-   * Met à jour le jsonExt du BenefitPlan
-   */
-  function updateJsonExt(inputJsonExt, outputFilters) {
-    const existingData = JSON.parse(inputJsonExt || '{}');
-    if (!existingData.hasOwnProperty('advanced_criteria')) {
-      existingData.advanced_criteria = [];
-    }
-    const filterData = JSON.parse(outputFilters);
-    existingData.advanced_criteria = filterData;
-    return JSON.stringify(existingData);
-  }
-
-  /**
-   * Sauvegarde des filtres appliqués
-   * Sérialisation correcte des objets Location (ou autres objets complexes)
-   */
-  const saveCriteria = () => {
-    setAppliedFiltersRowStructure(filters);
-
-    const outputFilters = JSON.stringify(
-      filters.map(({ filter, value, field, type, referential, typeLocation, amount }) => {
-        let safeValue = value ?? '';
-
-        // Sérialisation des objets (Locations, BenefitPlan, etc.)
-        if (typeof safeValue === 'object' && safeValue !== null) {
-          try {
-            safeValue = JSON.stringify(safeValue);
-          } catch (e) {
-            safeValue = '[Unserializable Object]';
-          }
-        }
-
-        // Détection automatique du type de localité si non précisé
-        if (referential === 'Location' && !typeLocation && value?.__typename) {
-          typeLocation = value.__typename.replace('GQLType', '');
-        }
-
-        return {
-          amount: amount ?? '',
-          field,
-          filter,
-          type,
-          referential,
-          typeLocation,
-          value: safeValue,
-          custom_filter_condition: `${field}__${filter}__${type}=${safeValue}`,
-        };
-      })
-    );
-
-    const jsonExt = updateJsonExt(objectToSave.jsonExt, outputFilters);
-    updateAttributes(jsonExt);
-    setAppliedCustomFilters(outputFilters);
-    handleClose();
-  };
-
   useEffect(() => {
-    if (object && _.isEmpty(object) === false) {
-      let paramsToFetchFilters = [];
-      if (objectType === BENEFIT_PLAN) {
-        paramsToFetchFilters = createParams(
-          moduleName,
-          objectType,
-          isBase64Encoded(object.id) ? decodeId(object.id) : object.id,
-          additionalParams,
-        );
-      } else {
-        paramsToFetchFilters = createParams(
-          moduleName,
-          objectType,
-          additionalParams,
-        );
-      }
-      fetchFilters(paramsToFetchFilters);
-    }
-  }, [object]);
+    if (!benefitPlanId) return;
+    const paramsToFetchFilters = createParams(
+      moduleName,
+      objectType,
+      benefitPlanId,
+      additionalParams,
+    );
+    fetchFilters(paramsToFetchFilters);
+  }, [benefitPlanId, moduleName, objectType]);
 
   return (
     <>
       {filters.map((filter, index) => (
         <AdvancedFiltersRowValue
-          key={index}
+          key={`criterion-row-${filter.field}-${index}`}
           customFilters={customFilters}
           currentFilter={filter}
           setCurrentFilter={setCurrentFilter}
@@ -174,6 +201,7 @@ function AdvancedFiltersDialog({
           filters={filters}
           setFilters={setFilters}
           readOnly={readOnly || confirmed}
+          benefitPlanId={benefitPlanId}
         />
       ))}
       {!readOnly && !confirmed ? (
@@ -187,7 +215,7 @@ function AdvancedFiltersDialog({
               cursor: 'pointer',
             }}
             onClick={handleAddFilter}
-            disabled={readOnly || confirmed}
+            disabled={readOnly || !benefitPlanId}
           />
           <Button
             onClick={handleAddFilter}
@@ -197,51 +225,32 @@ function AdvancedFiltersDialog({
               marginBottom: '6px',
               fontSize: '0.8rem',
             }}
-            disabled={readOnly || confirmed}
+            disabled={readOnly || !benefitPlanId}
           >
             {formatMessage(intl, 'payroll', 'payroll.advancedFilters.button.addFilters')}
           </Button>
         </div>
       ) : null}
 
-      <div>
+      <div style={{ clear: 'both', paddingTop: 8 }}>
         {!readOnly && !confirmed ? (
-          <>
-            <div style={{ float: 'left' }}>
-              <Button
-                onClick={handleRemoveFilter}
-                variant="outlined"
-                style={{
-                  border: '0px',
-                }}
-              >
-                {formatMessage(intl, 'payroll', 'payroll.advancedFilters.button.clearAllFilters')}
-              </Button>
-            </div>
-            <div
-              style={{
-                float: 'right',
-                paddingRight: '16px',
-              }}
+          <div style={{ float: 'left' }}>
+            <Button
+              onClick={handleRemoveFilter}
+              variant="outlined"
+              style={{ border: '0px' }}
+              disabled={filters.length === 0}
             >
-              <Button
-                onClick={saveCriteria}
-                variant="contained"
-                color="primary"
-                autoFocus
-                disabled={!object || confirmed || readOnly}
-              >
-                {formatMessage(intl, 'payroll', 'payroll.advancedFilters.button.filter')}
-              </Button>
-            </div>
-          </>
+              {formatMessage(intl, 'payroll', 'payroll.advancedFilters.button.clearAllFilters')}
+            </Button>
+          </div>
         ) : null}
       </div>
     </>
   );
 }
 
-const mapStateToProps = (state, props) => ({
+const mapStateToProps = (state) => ({
   rights:
     !!state.core && !!state.core.user && !!state.core.user.i_user
       ? state.core.user.i_user.rights

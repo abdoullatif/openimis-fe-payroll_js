@@ -33,6 +33,8 @@ export const ACTION_TYPE = {
   REJECT_PAYROLL: 'PAYROLL_MUTATION_REJECT_PAYROLL',
   MAKE_PAYMENT_PAYROLL: 'PAYROLL_MUTATION_MAKE_PAYMENT_PAYROLL',
   TRIGGER_PAYROLL_RECONCILIATION: 'PAYROLL_MUTATION_TRIGGER_PAYROLL_RECONCILIATION',
+  CANCEL_PAYROLL_PAYMENT: 'PAYROLL_MUTATION_CANCEL_PAYROLL_PAYMENT',
+  CANCEL_PAYROLL_RECONCILIATION: 'PAYROLL_MUTATION_CANCEL_PAYROLL_RECONCILIATION',
   GET_PAYROLL_PAYMENT_FILES: 'GET_PAYROLL_PAYMENT_FILES',
   BENEFITS_SUMMARY: 'PAYROLL_BENEFITS_SUMMARY',
   DELETE_BENEFIT_CONSUMPTION: 'BENEFIT_CONSUMPTION_MUTATION_DELETE_BENEFIT_CONSUMPTION',
@@ -51,6 +53,8 @@ export const MUTATION_SERVICE = {
     REJECT: 'rejectPayroll',
     MAKE_PAYMENT: 'makePaymentForPayroll',
     TRIGGER_RECONCILIATION: 'triggerPayrollReconciliation',
+    CANCEL_PAYMENT: 'cancelPayrollPayment',
+    CANCEL_RECONCILIATION: 'cancelPayrollReconciliation',
   },
   BENEFIT_CONSUMPTION: {
     DELETE: 'deleteBenefitConsumption',
@@ -443,7 +447,14 @@ function reducer(
     case REQUEST(ACTION_TYPE.MUTATION):
       return dispatchMutationReq(state, action);
     case ERROR(ACTION_TYPE.MUTATION):
-      return dispatchMutationErr(state, action);
+      return {
+        ...state,
+        submittingMutation: false,
+        mutation: {
+          ...state.mutation,
+          error: formatGraphQLError(action.payload) || formatServerError(action.payload),
+        },
+      };
     case SUCCESS(ACTION_TYPE.CREATE_PAYMENT_POINT):
       return dispatchMutationResp(state, MUTATION_SERVICE.PAYMENT_POINT.CREATE, action);
     case SUCCESS(ACTION_TYPE.DELETE_PAYMENT_POINT):
@@ -456,6 +467,62 @@ function reducer(
       return dispatchMutationResp(state, MUTATION_SERVICE.PAYROLL.DELETE, action);
     case SUCCESS(ACTION_TYPE.DELETE_BENEFIT_CONSUMPTION):
       return dispatchMutationResp(state, MUTATION_SERVICE.BENEFIT_CONSUMPTION.DELETE, action);
+    case SUCCESS(ACTION_TYPE.MAKE_PAYMENT_PAYROLL):
+      if (action.payload?.errors?.length
+        || !action.payload?.data?.[MUTATION_SERVICE.PAYROLL.MAKE_PAYMENT]?.internalId) {
+        return {
+          ...state,
+          submittingMutation: false,
+          mutation: {
+            ...state.mutation,
+            error: formatGraphQLError(action.payload) || { message: 'makePaymentForPayroll failed' },
+          },
+        };
+      }
+      return dispatchMutationResp(state, MUTATION_SERVICE.PAYROLL.MAKE_PAYMENT, action);
+    case SUCCESS(ACTION_TYPE.TRIGGER_PAYROLL_RECONCILIATION):
+      if (action.payload?.errors?.length
+        || !action.payload?.data?.[MUTATION_SERVICE.PAYROLL.TRIGGER_RECONCILIATION]?.internalId) {
+        return {
+          ...state,
+          submittingMutation: false,
+          mutation: {
+            ...state.mutation,
+            error: formatGraphQLError(action.payload) || { message: 'triggerPayrollReconciliation failed' },
+          },
+        };
+      }
+      return dispatchMutationResp(state, MUTATION_SERVICE.PAYROLL.TRIGGER_RECONCILIATION, action);
+    case SUCCESS(ACTION_TYPE.CANCEL_PAYROLL_PAYMENT):
+      if (action.payload?.errors?.length
+        || !action.payload?.data?.[MUTATION_SERVICE.PAYROLL.CANCEL_PAYMENT]?.internalId) {
+        return {
+          ...state,
+          submittingMutation: false,
+          mutation: {
+            ...state.mutation,
+            error: formatGraphQLError(action.payload) || { message: 'cancelPayrollPayment failed' },
+          },
+        };
+      }
+      return dispatchMutationResp(state, MUTATION_SERVICE.PAYROLL.CANCEL_PAYMENT, action);
+    case SUCCESS(ACTION_TYPE.CANCEL_PAYROLL_RECONCILIATION):
+      if (action.payload?.errors?.length
+        || !action.payload?.data?.[MUTATION_SERVICE.PAYROLL.CANCEL_RECONCILIATION]?.internalId) {
+        return {
+          ...state,
+          submittingMutation: false,
+          mutation: {
+            ...state.mutation,
+            error: formatGraphQLError(action.payload) || { message: 'cancelPayrollReconciliation failed' },
+          },
+        };
+      }
+      return dispatchMutationResp(state, MUTATION_SERVICE.PAYROLL.CANCEL_RECONCILIATION, action);
+    case SUCCESS(ACTION_TYPE.CLOSE_PAYROLL):
+      return dispatchMutationResp(state, MUTATION_SERVICE.PAYROLL.CLOSE, action);
+    case SUCCESS(ACTION_TYPE.REJECT_PAYROLL):
+      return dispatchMutationResp(state, MUTATION_SERVICE.PAYROLL.REJECT, action);
     default:
       return state;
   }

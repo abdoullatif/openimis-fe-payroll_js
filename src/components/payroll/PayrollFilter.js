@@ -1,20 +1,18 @@
 import React from 'react';
-import _debounce from 'lodash/debounce';
 
 import { FormControlLabel, Grid, Checkbox } from '@material-ui/core';
 import { makeStyles } from '@material-ui/styles';
 
 import {
-  TextInput,
   ControlledField,
   useModulesManager,
   useTranslations,
   PublishedComponent,
   decodeId,
 } from '@openimis/fe-core';
+import PayrollNameFilterSuggestionField from './PayrollNameFilterSuggestionField';
 import {
   CONTAINS_LOOKUP,
-  DEFAULT_DEBOUNCE_TIME,
   EMPTY_STRING,
   MODULE_NAME,
 } from '../../constants';
@@ -38,15 +36,13 @@ function PayrollFilter({
   const modulesManager = useModulesManager();
   const { formatMessage } = useTranslations(MODULE_NAME, modulesManager);
 
-  const debouncedOnChangeFilters = _debounce(onChangeFilters, DEFAULT_DEBOUNCE_TIME);
-
   const filterTextFieldValue = (filterName) => filters?.[filterName]?.value ?? EMPTY_STRING;
 
   const filterValue = (filterName) => filters?.[filterName]?.value ?? null;
 
-  const onChangeStringFilter = (filterName, lookup = null) => (value) => {
+  const onChangeStringFilter = (filterName, value, lookup = null) => {
     if (lookup) {
-      debouncedOnChangeFilters([
+      onChangeFilters([
         {
           id: filterName,
           value,
@@ -54,7 +50,7 @@ function PayrollFilter({
         },
       ]);
     } else {
-      debouncedOnChangeFilters([
+      onChangeFilters([
         {
           id: filterName,
           value,
@@ -67,11 +63,9 @@ function PayrollFilter({
   return (
     <Grid container className={classes.form}>
       <Grid item xs={3} className={classes.item}>
-        <TextInput
-          module="payroll"
-          label={formatMessage('payroll.name')}
+        <PayrollNameFilterSuggestionField
           value={filterTextFieldValue('name')}
-          onChange={onChangeStringFilter('name', CONTAINS_LOOKUP)}
+          onApplyFilter={onChangeStringFilter}
         />
       </Grid>
       <Grid item xs={3} className={classes.item}>

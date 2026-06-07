@@ -1,13 +1,14 @@
 import React from 'react';
-import PayrollPage from '../../pages/payroll/PayrollPage';
-import { EMPTY_STRING } from '../../constants';
+import PayrollTaskRecap from './PayrollTaskRecap';
 
 const PayrollTaskTableHeaders = () => [
-  EMPTY_STRING,
+  'Récapitulatif de la paie',
 ];
 
 const PayrollTaskItemFormatters = () => [
-  (payroll) => <PayrollPage taskPayrollUuid={payroll?.id} />,
+  (incomingData) => (
+    <PayrollTaskRecap incomingData={incomingData} />
+  ),
 ];
 
 export { PayrollTaskTableHeaders, PayrollTaskItemFormatters };

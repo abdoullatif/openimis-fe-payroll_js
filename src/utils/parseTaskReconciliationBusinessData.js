@@ -14,18 +14,27 @@ export function parseTaskReconciliationBusinessData(raw) {
     }
   }
 
-  const incoming = data.incoming_data && typeof data.incoming_data === 'object'
+  const rawIncoming = data.incoming_data && typeof data.incoming_data === 'object'
     ? data.incoming_data
     : data;
   const recap = data.reconciliation_recap
-    ?? incoming.reconciliation_recap
+    ?? rawIncoming.reconciliation_recap
     ?? {};
 
-  return { incoming, recap };
-}
+  const incoming = {
+    ...rawIncoming,
+    payroll: rawIncoming.payroll ?? rawIncoming.payroll_name ?? recap.payroll_name,
+    statut_paie: rawIncoming.statut_paie ?? rawIncoming.payroll_status,
+    recapitulatif_reconciliation: rawIncoming.recapitulatif_reconciliation
+      ?? rawIncoming.recapitulatif_plan_paiement,
+    note_liste_tronquee: rawIncoming.note_liste_tronquee ?? recap.note_liste_tronquee,
+    benefices_truncated: rawIncoming.benefices_truncated ?? recap.benefices_truncated,
+    factures_truncated: rawIncoming.factures_truncated ?? recap.factures_truncated,
+    detail_factures_reconciliees: rawIncoming.detail_factures_reconciliees
+      ?? recap.detail_factures_reconciliees,
+    detail_factures_en_attente: rawIncoming.detail_factures_en_attente
+      ?? recap.detail_factures_en_attente,
+  };
 
-export function asArray(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) return value;
-  return [value];
+  return { incoming, recap };
 }
