@@ -39,35 +39,31 @@ const buildCustomFilterCondition = ({ field, filter, value, type }) => {
   return `${field}__${filter}__${valueType}=${normalizedValue}`;
 };
 
+const serializeCriteriaValue = (value) => {
+  if (value === null || value === undefined || value === '') return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object' && value.name) {
+    return {
+      name: value.name,
+      ...(value.code ? { code: value.code } : {}),
+      ...(value.uuid ? { uuid: value.uuid } : {}),
+    };
+  }
+  return normalizeFilterValue(value);
+};
+
 const buildSavedCriteriaRows = (filters) => filters
   .filter(({ field, filter, value }) => field && filter && normalizeFilterValue(value) !== '')
-  .map(({ filter, value, field, type, referential, typeLocation, amount }) => {
-    let safeValue = value ?? '';
-    let resolvedTypeLocation = typeLocation;
-
-    if (typeof safeValue === 'object' && safeValue !== null) {
-      try {
-        safeValue = JSON.stringify(safeValue);
-      } catch (e) {
-        safeValue = '[Unserializable Object]';
-      }
-    }
-
-    if (referential === 'Location' && !resolvedTypeLocation && value?.__typename) {
-      resolvedTypeLocation = value.__typename.replace('GQLType', '');
-    }
-
-    return {
-      amount: amount ?? '',
-      field,
-      filter,
-      type,
-      referential,
-      typeLocation: resolvedTypeLocation,
-      value: safeValue,
-      custom_filter_condition: buildCustomFilterCondition({ field, filter, value, type }),
-    };
-  })
+  .map(({ filter, value, field, type, referential, typeLocation, amount }) => ({
+    amount: amount ?? '',
+    field,
+    filter,
+    type,
+    referential,
+    typeLocation,
+    value: serializeCriteriaValue(value),
+    custom_filter_condition: buildCustomFilterCondition({ field, filter, value, type }),
+  }))
   .filter((entry) => !!entry.custom_filter_condition);
 
 const getCriteriaFromJsonExt = (jsonExt) => {

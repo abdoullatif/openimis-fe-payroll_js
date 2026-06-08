@@ -13,7 +13,8 @@ import {
   useTranslations,
   CustomFilterTypeStatusPicker,
   CustomFilterFieldStatusPicker,
-  CustomFilterValueSuggestionsInput,
+  CustomFilterFieldValueInput,
+  shouldUseCustomFilterValueSuggestions,
 } from "@openimis/fe-core";
 import { Grid } from "@material-ui/core";
 import { withTheme, withStyles } from "@material-ui/core/styles";
@@ -32,12 +33,8 @@ const styles = (theme) => ({
   item: theme.paper.item,
 });
 
-function shouldUseCustomFilterValueSuggestions(filter) {
-  if (!filter?.field) return false;
-  if (filter.referential || filter.typeLocation) return false;
-  if (filter.type === BOOLEAN) return false;
-  return true;
-}
+const CUSTOM_FILTER_MODULE_NAME = "social_protection";
+const CUSTOM_FILTER_OBJECT_TYPE = "BenefitPlan";
 
 function AdvancedFiltersRowValue({
   classes,
@@ -99,62 +96,22 @@ function AdvancedFiltersRowValue({
       readOnly,
     };
 
-    // Utiliser les pickers du module location
-    if (currentFilter.referential === "Location") {
-      switch (currentFilter.typeLocation) {
-        case "Region":
-          return (
-            <PublishedComponent
-              pubRef="location.LocationPicker"
-              {...commonProps}
-              locationLevel={0}
-            />
-          );
-        case "District":
-          return (
-            <PublishedComponent
-              pubRef="location.LocationPicker"
-              {...commonProps}
-              locationLevel={1}
-            />
-          );
-        case "Municipality":
-          return (
-            <PublishedComponent
-              pubRef="location.LocationPicker"
-              {...commonProps}
-              locationLevel={2}
-            />
-          );
-        case "Village":
-          return (
-            <PublishedComponent
-              pubRef="location.LocationPicker"
-              {...commonProps}
-              locationLevel={3}
-            />
-          );
-        default:
-          return null;
-      }
-    }
-
-    // Cas normaux
     switch (type) {
       case BOOLEAN:
         return <SelectInput options={BOOL_OPTIONS} {...commonProps} />;
       case INTEGER:
         if (shouldUseCustomFilterValueSuggestions(currentFilter) && benefitPlanId) {
           return (
-            <CustomFilterValueSuggestionsInput
+            <CustomFilterFieldValueInput
               key={`${currentFilter.field}-${benefitPlanId}`}
               label={commonProps.label}
               value={currentFilter.value}
               onChange={onAttributeChange("value")}
               readOnly={readOnly}
               field={currentFilter.field}
-              moduleName="payroll"
-              objectTypeName="BenefitPlan"
+              filterMeta={currentFilter}
+              moduleName={CUSTOM_FILTER_MODULE_NAME}
+              objectTypeName={CUSTOM_FILTER_OBJECT_TYPE}
               uuidOfObject={benefitPlanId}
               minLength={1}
             />
@@ -168,15 +125,16 @@ function AdvancedFiltersRowValue({
         }
         if (shouldUseCustomFilterValueSuggestions(currentFilter) && benefitPlanId) {
           return (
-            <CustomFilterValueSuggestionsInput
+            <CustomFilterFieldValueInput
               key={`${currentFilter.field}-${benefitPlanId}`}
               label={commonProps.label}
               value={currentFilter.value}
               onChange={onAttributeChange("value")}
               readOnly={readOnly}
               field={currentFilter.field}
-              moduleName="payroll"
-              objectTypeName="BenefitPlan"
+              filterMeta={currentFilter}
+              moduleName={CUSTOM_FILTER_MODULE_NAME}
+              objectTypeName={CUSTOM_FILTER_OBJECT_TYPE}
               uuidOfObject={benefitPlanId}
               minLength={1}
             />
