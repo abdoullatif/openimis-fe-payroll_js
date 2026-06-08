@@ -193,6 +193,12 @@
     "payroll.benefitConsumption.payedOnTime": "Payed On Time",
     "payroll.benefitConsumption.paymentDate": "Payment Date",
     "payroll.paymentData.upload.label": "Upload Payment Data",
+    "payroll.reconciliationFile.processing.title": "Reconciliation file processing in progress",
+    "payroll.reconciliationFile.processing.errorTitle": "File processing failed",
+    "payroll.reconciliationFile.processing.uploading": "Uploading and parsing CSV file…",
+    "payroll.reconciliationFile.processing.file": "File: {fileName}",
+    "payroll.reconciliationFile.processing.success": "Reconciliation file processed successfully",
+    "payroll.reconciliationFile.processing.errorGeneric": "Reconciliation file processing failed",
 
     "payroll.route.payrollsApproved": "Approved Payrolls",
     "payroll.route.payrollsPending": "Pending Payrolls",

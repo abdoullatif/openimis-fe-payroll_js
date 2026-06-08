@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Input, Grid } from '@material-ui/core';
 import { injectIntl } from 'react-intl';
 import Button from '@material-ui/core/Button';
@@ -10,10 +10,19 @@ import {
   apiHeaders,
   baseApiUrl,
   formatMessage,
+  formatMessageWithValues,
+  useModulesManager,
+  useToast,
 } from '@openimis/fe-core';
 import { withTheme, withStyles } from '@material-ui/core/styles';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
+import { MODULE_NAME } from '../../../constants';
+import { fetchPayroll } from '../../../actions';
+import { startPayrollModalProgressPolling } from '../../../services/payrollApprovedPaymentPollingService';
+import { notifyReconciliationCompleted } from '../../../utils/payrollReconciliationToast';
+import { getPayrollBackendErrorMessage } from '../../../utils/payrollBackendErrors';
+import PayrollReconciliationFileProcessingDialog from './PayrollReconciliationFileProcessingDialog';
 
 const styles = (theme) => ({
   item: theme.paper.item,
@@ -23,17 +32,90 @@ function PayrollPaymentDataUploadDialog({
   intl,
   classes,
   payrollUuid,
+  dispatch,
+  fetchPayroll: fetchPayrollAction,
 }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [forms, setForms] = useState({});
+  const modulesManager = useModulesManager();
+  const toast = useToast();
+  const stopPollRef = useRef(null);
 
-  const handleOpen = () => {
-    setIsOpen(true);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [forms, setForms] = useState({});
+  const [processingOpen, setProcessingOpen] = useState(false);
+  const [processingPhase, setProcessingPhase] = useState('uploading');
+  const [processingFileName, setProcessingFileName] = useState('');
+  const [progressPayroll, setProgressPayroll] = useState(null);
+  const [processingError, setProcessingError] = useState(null);
+
+  useEffect(() => () => {
+    stopPollRef.current?.();
+  }, []);
+
+  const stopPolling = () => {
+    stopPollRef.current?.();
+    stopPollRef.current = null;
   };
 
-  const handleClose = () => {
+  const refreshPayroll = () => {
+    if (!payrollUuid) return;
+    fetchPayrollAction(modulesManager, [`id: "${payrollUuid}"`]);
+  };
+
+  const closeProcessing = () => {
+    stopPolling();
+    setProcessingOpen(false);
+    setProcessingPhase('uploading');
+    setProgressPayroll(null);
+    setProcessingError(null);
+    setProcessingFileName('');
+  };
+
+  const handleTerminal = (row, decision) => {
+    const status = row?.reconciliationProgress?.status;
+    if (status === 'FAILED') {
+      toast.showError(
+        row?.reconciliationProgress?.error
+        || formatMessage(intl, MODULE_NAME, 'payroll.operation.failed'),
+      );
+    } else if (decision?.reason === 'ghost') {
+      toast.showError(formatMessage(intl, MODULE_NAME, 'payroll.operation.failed'));
+    } else {
+      notifyReconciliationCompleted(
+        row,
+        toast,
+        (id) => formatMessage(intl, MODULE_NAME, id),
+        (id, values) => formatMessageWithValues(intl, MODULE_NAME, id, values),
+      );
+    }
+    refreshPayroll();
+    closeProcessing();
+  };
+
+  const startReconciliationPolling = () => {
+    stopPolling();
+    stopPollRef.current = startPayrollModalProgressPolling(dispatch, payrollUuid, {
+      operation: 'reconciliation',
+      onProgress: (row) => {
+        setProcessingPhase('processing');
+        setProgressPayroll(row);
+      },
+      onTerminal: handleTerminal,
+      onStop: stopPolling,
+    });
+  };
+
+  const finishAfterUpload = () => {
+    setProcessingPhase('processing');
+    startReconciliationPolling();
+  };
+
+  const handleOpen = () => {
+    setIsUploadOpen(true);
+  };
+
+  const handleCloseUpload = () => {
     setForms({});
-    setIsOpen(false);
+    setIsUploadOpen(false);
   };
 
   const handleFieldChange = (formName, fieldName, value) => {
@@ -47,15 +129,20 @@ function PayrollPaymentDataUploadDialog({
   };
 
   const onSubmit = async (values) => {
-    const fileFormat = values.file.type;
+    if (!values?.file || !payrollUuid) return;
+
+    const file = values.file;
+    setProcessingFileName(file.name);
+    setProcessingError(null);
+    setProgressPayroll(null);
+    setProcessingPhase('uploading');
+    handleCloseUpload();
+    setProcessingOpen(true);
+
     const formData = new FormData();
+    formData.append('file', file);
 
-    formData.append('file', values.file);
-
-    let urlImport;
-    if (fileFormat.includes('/csv')) {
-      urlImport = `${baseApiUrl}/payroll/csv_reconciliation/?payroll_id=${payrollUuid}`;
-    }
+    const urlImport = `${baseApiUrl}/payroll/csv_reconciliation/?payroll_id=${encodeURIComponent(payrollUuid)}`;
 
     try {
       const response = await fetch(urlImport, {
@@ -65,15 +152,28 @@ function PayrollPaymentDataUploadDialog({
         credentials: 'same-origin',
       });
 
-      await response.json();
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = null;
+      }
 
       if (response.status >= 400) {
-        handleClose();
-        return;
+        const message = payload?.error
+          || payload?.detail
+          || `${response.status} ${response.statusText}`;
+        throw new Error(message);
       }
-      handleClose();
+
+      finishAfterUpload();
     } catch (error) {
-      handleClose();
+      setProcessingPhase('error');
+      setProcessingError(
+        getPayrollBackendErrorMessage(error, (id) => formatMessage(intl, MODULE_NAME, id))
+        || error?.message
+        || formatMessage(intl, MODULE_NAME, 'payroll.reconciliationFile.processing.errorGeneric'),
+      );
     }
   };
 
@@ -88,12 +188,13 @@ function PayrollPaymentDataUploadDialog({
           border: '0px',
           marginTop: '6px',
         }}
+        disabled={processingOpen}
       >
-        {formatMessage(intl, 'payroll', 'payroll.paymentData.upload.label')}
+        {formatMessage(intl, MODULE_NAME, 'payroll.paymentData.upload.label')}
       </Button>
       <Dialog
-        open={isOpen}
-        onClose={handleClose}
+        open={isUploadOpen}
+        onClose={handleCloseUpload}
         PaperProps={{
           style: {
             width: 600,
@@ -102,17 +203,11 @@ function PayrollPaymentDataUploadDialog({
         }}
       >
         <form noValidate>
-          <DialogTitle
-            style={{
-              marginTop: '10px',
-            }}
-          >
-            {formatMessage(intl, 'payroll', 'payroll.paymentData.upload.label')}
+          <DialogTitle style={{ marginTop: '10px' }}>
+            {formatMessage(intl, MODULE_NAME, 'payroll.paymentData.upload.label')}
           </DialogTitle>
           <DialogContent>
-            <div
-              style={{ backgroundColor: '#DFEDEF', paddingLeft: '10px', paddingBottom: '10px' }}
-            >
+            <div style={{ backgroundColor: '#DFEDEF', paddingLeft: '10px', paddingBottom: '10px' }}>
               <Grid item>
                 <Grid container spacing={4} direction="column">
                   <Grid item>
@@ -141,7 +236,7 @@ function PayrollPaymentDataUploadDialog({
             <div style={{ maxWidth: '1000px' }}>
               <div style={{ float: 'left' }}>
                 <Button
-                  onClick={handleClose}
+                  onClick={handleCloseUpload}
                   variant="outlined"
                   autoFocus
                   style={{
@@ -149,7 +244,7 @@ function PayrollPaymentDataUploadDialog({
                     marginBottom: '15px',
                   }}
                 >
-                  Cancel
+                  {formatMessage(intl, MODULE_NAME, 'payroll.benefitConsumption.cancel')}
                 </Button>
               </div>
               <div style={{ float: 'right', paddingRight: '16px' }}>
@@ -157,15 +252,23 @@ function PayrollPaymentDataUploadDialog({
                   variant="contained"
                   color="primary"
                   onClick={() => onSubmit(forms.paymentData)}
-                  disabled={!(forms.paymentData?.file && payrollUuid)}
+                  disabled={!(forms.paymentData?.file && payrollUuid) || processingOpen}
                 >
-                  {formatMessage(intl, 'payroll', 'payroll.paymentData.upload.label')}
+                  {formatMessage(intl, MODULE_NAME, 'payroll.paymentData.upload.label')}
                 </Button>
               </div>
             </div>
           </DialogActions>
         </form>
       </Dialog>
+      <PayrollReconciliationFileProcessingDialog
+        open={processingOpen}
+        phase={processingPhase}
+        fileName={processingFileName}
+        progressPayroll={progressPayroll}
+        errorMessage={processingError}
+        onClose={closeProcessing}
+      />
     </>
   );
 }
@@ -175,8 +278,12 @@ const mapStateToProps = (state) => ({
   confirmed: state.core.confirmed,
 });
 
-const mapDispatchToProps = (dispatch) => bindActionCreators({
-}, dispatch);
+const mapDispatchToProps = (dispatch) => ({
+  dispatch,
+  ...bindActionCreators({
+    fetchPayroll,
+  }, dispatch),
+});
 
 export default injectIntl(
   withTheme(

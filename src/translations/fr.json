@@ -193,6 +193,12 @@
     "payroll.benefitConsumption.payedOnTime": "Payé à Temps",
     "payroll.benefitConsumption.paymentDate": "Date de Paiement",
     "payroll.paymentData.upload.label": "Télécharger les Données de Paiement",
+    "payroll.reconciliationFile.processing.title": "Traitement du fichier de réconciliation en cours",
+    "payroll.reconciliationFile.processing.errorTitle": "Échec du traitement du fichier",
+    "payroll.reconciliationFile.processing.uploading": "Envoi et analyse du fichier CSV en cours…",
+    "payroll.reconciliationFile.processing.file": "Fichier : {fileName}",
+    "payroll.reconciliationFile.processing.success": "Fichier de réconciliation traité avec succès",
+    "payroll.reconciliationFile.processing.errorGeneric": "Le traitement du fichier de réconciliation a échoué",
 
     "payroll.route.payrollsApproved": "Paies Approuvées",
     "payroll.route.payrollsPending": "Paies en Attente",
