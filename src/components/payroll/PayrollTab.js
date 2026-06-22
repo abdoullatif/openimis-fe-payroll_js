@@ -1,6 +1,6 @@
 /* eslint-disable max-len */
 import React, { useState } from 'react';
-import { Paper, Grid } from '@material-ui/core';
+import { Paper, Grid, CircularProgress } from '@material-ui/core';
 import {
   Contributions,
   useModulesManager,
@@ -15,6 +15,7 @@ import {
   PAYROLL_TABS_PANEL_CONTRIBUTION_KEY,
   PAYROLL_STATUS,
   MODULE_NAME,
+  PAYMENT_METHOD_OFFLINE,
 } from '../../constants';
 import PayrollPaymentDataUploadDialog from './dialogs/PayrollPaymentDataUploadDialog';
 import downloadPayroll from '../../utils/export';
@@ -46,6 +47,7 @@ function PayrollTab({
   const classes = useStyles();
 
   const [activeTab, setActiveTab] = useState(BENEFIT_CONSUMPTION_LIST_TAB_VALUE);
+  const [downloading, setDownloading] = useState(false);
 
   const isSelected = (tab) => tab === activeTab;
 
@@ -58,6 +60,7 @@ function PayrollTab({
   const toast = useToast();
 
   const downloadPayrollData = async () => {
+    setDownloading(true);
     try {
       await downloadPayroll(payrollUuid, payroll?.name);
       toast.showSuccess(formatMessage('payroll.summary.download.success') || 'Téléchargement réussi');
@@ -67,6 +70,8 @@ function PayrollTab({
       toast.showError(
         error?.message || formatMessage('payroll.summary.download.error') || 'Erreur lors du téléchargement',
       );
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -93,16 +98,22 @@ function PayrollTab({
                 onClick={downloadPayrollData}
                 color="#DFEDEF"
                 className={classes.button}
+                disabled={downloading}
                 style={{
                   border: '0px',
                   marginTop: '6px',
                   textTransform: 'uppercase',
                 }}
               >
-                {formatMessage('payroll.summary.download')}
+                {downloading && (
+                  <CircularProgress size={16} style={{ marginRight: 8 }} />
+                )}
+                {downloading
+                  ? formatMessage('payroll.summary.downloading')
+                  : formatMessage('payroll.summary.download')}
               </Button>
             )}
-            {payrollUuid && payroll?.status === PAYROLL_STATUS.APPROVE_FOR_PAYMENT && payroll.paymentMethod === 'StrategyOfflinePayment'
+            {payrollUuid && payroll?.status === PAYROLL_STATUS.APPROVE_FOR_PAYMENT && payroll.paymentMethod === PAYMENT_METHOD_OFFLINE
                 && (
                 <PayrollPaymentDataUploadDialog
                   payrollUuid={payrollUuid}

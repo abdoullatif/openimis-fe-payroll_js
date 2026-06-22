@@ -5,6 +5,7 @@ import Dialog from '@material-ui/core/Dialog';
 import DialogActions from '@material-ui/core/DialogActions';
 import DialogContent from '@material-ui/core/DialogContent';
 import DialogTitle from '@material-ui/core/DialogTitle';
+import CircularProgress from '@material-ui/core/CircularProgress';
 import {
   useModulesManager,
   useTranslations,
@@ -174,6 +175,9 @@ function PaymentReconcilationSummarytDialog({
                   marginBottom: '15px',
                 }}
               >
+                {downloading && (
+                  <CircularProgress size={16} style={{ marginRight: 8 }} />
+                )}
                 {downloading ? (formatMessage('payroll.summary.downloading') || 'Téléchargement...') : formatMessage('payroll.summary.download')}
               </Button>
             </div>

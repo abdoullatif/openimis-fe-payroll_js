@@ -1329,6 +1329,9 @@ function PaymentApproveForPaymentDialog({
                 disabled={downloading}
                 style={{ margin: '0 16px', marginBottom: '15px' }}
               >
+                {downloading && (
+                  <CircularProgress size={16} style={{ marginRight: 8 }} />
+                )}
                 {downloading
                   ? formatMessage('payroll.summary.downloading')
                   : formatMessage('payroll.summary.download')}

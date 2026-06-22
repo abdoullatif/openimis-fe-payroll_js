@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 
-import { IconButton, Tooltip } from '@material-ui/core';
+import { IconButton, Tooltip, CircularProgress } from '@material-ui/core';
 import DownloadIcon from '@material-ui/icons/CloudDownload';
 
 import {
@@ -31,6 +31,7 @@ function PayrollPaymentFilesSearcher({
 }) {
   const modulesManager = useModulesManager();
   const toast = useToast();
+  const [downloadingFile, setDownloadingFile] = useState(null);
   const { formatMessage, formatMessageWithValues } = useTranslations(MODULE_NAME, modulesManager);
 
   const headers = () => [
@@ -58,6 +59,7 @@ function PayrollPaymentFilesSearcher({
   };
 
   const download = async (payrollId, fileName) => {
+    setDownloadingFile(fileName);
     try {
       await downloadPayroll(payrollId, fileName, false);
       toast.showSuccess(formatMessage('payroll.summary.download.success') || 'Téléchargement réussi');
@@ -66,6 +68,8 @@ function PayrollPaymentFilesSearcher({
       toast.showError(
         error?.message || formatMessage('payroll.summary.download.error') || 'Erreur lors du téléchargement',
       );
+    } finally {
+      setDownloadingFile(null);
     }
   };
 
@@ -77,17 +81,25 @@ function PayrollPaymentFilesSearcher({
     (file) => file.fileName,
     (file) => file.status,
     (file) => file.error,
-    (file) => (
-      <Tooltip title={formatMessage('tooltip.download')}>
-        <IconButton
-          onClick={() => download(payrollUuid, file.fileName)}
-          disabled={![PAYROLL_PAYMENT_FILE_STATUS.SUCCESS,
-            PAYROLL_PAYMENT_FILE_STATUS.PARTIAL_SUCCESS].includes(file.status)}
-        >
-          <DownloadIcon />
-        </IconButton>
-      </Tooltip>
-    ),
+    (file) => {
+      const isDownloading = downloadingFile === file.fileName;
+      return (
+        <Tooltip title={formatMessage(isDownloading ? 'payroll.summary.downloading' : 'tooltip.download')}>
+          <span>
+            <IconButton
+              onClick={() => download(payrollUuid, file.fileName)}
+              disabled={
+                isDownloading
+                || ![PAYROLL_PAYMENT_FILE_STATUS.SUCCESS,
+                  PAYROLL_PAYMENT_FILE_STATUS.PARTIAL_SUCCESS].includes(file.status)
+              }
+            >
+              {isDownloading ? <CircularProgress size={24} /> : <DownloadIcon />}
+            </IconButton>
+          </span>
+        </Tooltip>
+      );
+    },
     (file) => (
       <AdditionalFieldsDialog
         jsonExt={file?.jsonExt}
