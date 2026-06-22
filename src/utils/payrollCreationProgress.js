@@ -88,12 +88,18 @@ export function isAwaitingMutationEnd(progress, mutationInFlight) {
 }
 
 /**
- * Close modal only when backend says done AND the long mutation request has returned.
+ * Close modal when backend reports a terminal state.
+ * COMPLETED + shouldStopPolling (or payroll_id) closes even if the HTTP mutation
+ * is still open — prod proxies may leave submittingMutation stuck while cache is done.
  */
 export function canCloseCreationUI(progress, mutationInFlight) {
-  if (mutationInFlight) return false;
   if (!progress) return false;
-  if (progress.status === 'COMPLETED') return true;
+  if (progress.status === 'COMPLETED') {
+    if (isStopPollingFlag(progress)) return true;
+    if (getCreationPayrollId(progress)) return true;
+    return !mutationInFlight;
+  }
+  if (mutationInFlight) return false;
   if (progress.status === 'FAILED' || progress.status === 'CANCELLED' || progress.status === 'STALE') {
     return true;
   }
@@ -161,13 +167,14 @@ export function shouldStopCreationPolling(progress, hasSeenInProgress = false, m
   if (!progress) return false;
 
   if (progress.shouldStopPolling) {
-    if (progress.status === 'COMPLETED') return !mutationInFlight;
+    if (progress.status === 'COMPLETED') return true;
     return !mutationInFlight && hasSeenInProgress;
   }
 
   const status = progress.status;
 
   if (status === 'COMPLETED') {
+    if (getCreationPayrollId(progress)) return true;
     return !mutationInFlight;
   }
 
@@ -187,6 +194,27 @@ export function markInProgressSeen(progress) {
   if (!progress) return false;
   if (isCreationActive(progress)) return true;
   return hasMeaningfulProgress(progress);
+}
+
+/** Évite le clignotement 0/N quand le poll alterne réponses vides et complètes. */
+export function mergeCreationProgressCounters(prev, next) {
+  if (!next) return prev ?? null;
+  if (!prev) return next;
+  const processed = Math.max(
+    getCreationProcessedCount(prev),
+    getCreationProcessedCount(next),
+  );
+  const total = Math.max(
+    getCreationTotalCount(prev),
+    getCreationTotalCount(next),
+  );
+  const percent = Math.max(getCreationPercent(prev), getCreationPercent(next));
+  return {
+    ...next,
+    processedBeneficiaries: processed,
+    totalBeneficiaries: total,
+    percent,
+  };
 }
 
 export function resolveTerminalCreationStatus(progress) {

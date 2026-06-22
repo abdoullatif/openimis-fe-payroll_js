@@ -15,13 +15,24 @@ import { PAYROLL_PROGRESS_TERMINAL } from '../utils/payrollOperationProgress';
 export function startPayrollCreationPolling(dispatch, clientMutationId, callbacks, payrollId = null) {
   let hasSeenInProgress = false;
   let consecutiveCancelled = 0;
+  let intervalId = null;
+  let stopped = false;
+
+  const stopPolling = () => {
+    stopped = true;
+    if (intervalId != null) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+  };
 
   const poll = () => {
+    if (stopped) return;
     const mutationInFlight = callbacks.isMutationInFlight?.() ?? false;
 
     dispatch(fetchPayrollCreationProgressThunk(clientMutationId, payrollId))
       .then((progress) => {
-        if (!progress) return;
+        if (!progress || stopped) return;
 
         const sanitized = sanitizeCreationProgress(progress, hasSeenInProgress);
         if (markInProgressSeen(sanitized)) {
@@ -30,10 +41,10 @@ export function startPayrollCreationPolling(dispatch, clientMutationId, callback
 
         if (sanitized?.shouldStopPolling && PAYROLL_PROGRESS_TERMINAL.includes(sanitized.status)) {
           const stop = shouldStopCreationPolling(sanitized, hasSeenInProgress, mutationInFlight);
+          callbacks.onProgress?.(sanitized, { mutationInFlight });
           if (stop) {
             callbacks.onTerminal?.(sanitized, { mutationInFlight });
-          } else {
-            callbacks.onProgress?.(sanitized, { mutationInFlight });
+            stopPolling();
           }
           return;
         }
@@ -53,15 +64,16 @@ export function startPayrollCreationPolling(dispatch, clientMutationId, callback
 
         if (stop) {
           callbacks.onTerminal?.(sanitized, { mutationInFlight });
+          stopPolling();
         }
       })
       .catch(() => {});
   };
 
   poll();
-  const intervalId = setInterval(poll, callbacks.pollIntervalMs ?? 500);
+  intervalId = setInterval(poll, callbacks.pollIntervalMs ?? 500);
 
-  return () => clearInterval(intervalId);
+  return stopPolling;
 }
 
 export function fetchPayrollCreationProgressThunk(clientMutationId, payrollId = null) {

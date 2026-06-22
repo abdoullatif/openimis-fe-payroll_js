@@ -40,6 +40,7 @@ import {
   generateClientMutationId,
   getCreationPayrollId,
   getCreationTaskBarHint,
+  mergeCreationProgressCounters,
 } from '../../utils/payrollCreationProgress';
 import { journalizePayrollCreationTaskBarPending } from '../../utils/payrollAsyncMutation';
 
@@ -95,8 +96,9 @@ function PayrollPage({
   const terminalPayrollIdRef = useRef(null);
 
   const updateCreationProgress = (progress) => {
-    creationProgressRef.current = progress;
-    setCreationProgress(progress);
+    const merged = mergeCreationProgressCounters(creationProgressRef.current, progress);
+    creationProgressRef.current = merged;
+    setCreationProgress(merged);
   };
 
   const back = () => history.goBack();
@@ -176,13 +178,16 @@ function PayrollPage({
   const tryCompleteCreation = (payrollId) => {
     if (creationModalClosedRef.current || creationAbortedRef.current) return;
 
-    const normalizedId = normalizePayrollId(payrollId || terminalPayrollIdRef.current);
+    const progress = creationProgressRef.current;
+    const progressPayrollId = getCreationPayrollId(progress);
+    const normalizedId = normalizePayrollId(
+      payrollId || progressPayrollId || terminalPayrollIdRef.current,
+    );
     if (normalizedId) {
       terminalPayrollIdRef.current = normalizedId;
       pendingNavigationPayrollIdRef.current = normalizedId;
     }
 
-    const progress = creationProgressRef.current;
     const mutationInFlight = submittingMutationRef.current;
     const mayClose = canCloseCreationUI(progress, mutationInFlight)
       || (normalizedId && canCloseCreationAfterMutationFallback(progress, mutationInFlight));
